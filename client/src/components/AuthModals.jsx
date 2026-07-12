@@ -46,7 +46,22 @@ function PasswordField({ label, value, onChange, autoComplete = 'new-password', 
           placeholder="At least 8 characters"
         />
         <button type="button" className={`eye-hand ${shown ? 'open' : ''}`} onClick={() => setShown((value) => !value)} aria-label={shown ? 'Hide password' : 'Show password'}>
-          <span className="eye-face">◉</span><span className="covering-hand">✋</span>
+          <svg className="password-people" viewBox="0 0 76 48" aria-hidden="true">
+            <path className="girl-hair" d="M17 29C17 12 26 4 38 4s21 8 21 25l-5-5H22l-5 5Z" />
+            <path className="girl-face" d="M23 22c0-10 6-15 15-15s15 5 15 15v9c0 8-6 13-15 13s-15-5-15-13v-9Z" />
+            <path className="girl-brow" d="M27 21c3-2 6-2 9 0M40 21c3-2 6-2 9 0" />
+            <ellipse className="girl-eye" cx="31.5" cy="25.5" rx="3.2" ry="2.2" />
+            <ellipse className="girl-eye" cx="44.5" cy="25.5" rx="3.2" ry="2.2" />
+            <circle className="girl-pupil" cx="31.5" cy="25.5" r="1.2" />
+            <circle className="girl-pupil" cx="44.5" cy="25.5" r="1.2" />
+            <path className="girl-smile" d="M34 35c2.5 1.7 5.5 1.7 8 0" />
+            <g className="boy-hands">
+              <path className="boy-sleeve" d="M0 29 20 22l5 12L5 43Z" />
+              <path className="boy-sleeve" d="m76 29-20-7-5 12 20 9Z" />
+              <path className="boy-hand" d="M18 18c2-1 3 0 4 2l1-4c.4-2 3-2 3 0v4l1-4c.5-2 3-1.5 3 .5v4l1-3c.8-2 3-.8 2.5 1.2L31 30c-.5 3-3 5-6 5-4 0-7-3-7-7v-10Z" />
+              <path className="boy-hand" d="M58 18c-2-1-3 0-4 2l-1-4c-.4-2-3-2-3 0v4l-1-4c-.5-2-3-1.5-3 .5v4l-1-3c-.8-2-3-.8-2.5 1.2L45 30c.5 3 3 5 6 5 4 0 7-3 7-7v-10Z" />
+            </g>
+          </svg>
         </button>
       </div>
     </label>

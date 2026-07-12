@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Compass, HeartHandshake, RefreshCw, Sparkles, TrendingUp, X } from 'lucide-react';
+import { Compass, RefreshCw, Sparkles, X } from 'lucide-react';
 import Nav from './components/Nav';
 import BottomDock from './components/BottomDock';
 import UploadModal from './components/UploadModal';
@@ -525,34 +525,6 @@ export default function App() {
         <SearchPanel query={query} people={people} posts={posts.length ? posts : demoPosts} onFollow={follow} onPerson={openPerson} onPost={openPost} viewer={user} onRequireAuth={requireAccount} />
       ) : (
         <main className="home-layout" id="main-content">
-          <aside className="left-rail">
-            <div className="welcome-card">
-              <div className="welcome-copy">
-                <p className="eyebrow"><HeartHandshake size={14} /> A human place</p>
-                <h1>Whatever you carry, place it here.</h1>
-                <p>Text, photographs, long films or little moments. Mother keeps all four close.</p>
-                <button type="button" className="primary-button" onClick={() => openUpload()}>Share something</button>
-              </div>
-              <img
-                src="/brand/mother-heart-portrait.jpg"
-                alt="Ali Suleman and Mother's muse making a heart with their hands"
-                width="1254"
-                height="1254"
-                decoding="async"
-                fetchpriority="high"
-              />
-            </div>
-            <div className="discover-card">
-              <p className="eyebrow"><TrendingUp size={14} /> Living conversations</p>
-              <h2>Wander by a feeling</h2>
-              <div className="topic-cloud">
-                {['slow living', 'social media mother', 'clay', 'short film', 'city rain', 'creative courage'].map((topic, index) => (
-                  <button type="button" key={topic} onClick={() => changeQuery(topic)}><span>0{index + 1}</span>{topic}</button>
-                ))}
-              </div>
-            </div>
-          </aside>
-
           <section className="feed-section" aria-labelledby="feed-title">
             <header className="feed-heading">
               <div>

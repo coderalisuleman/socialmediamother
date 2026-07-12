@@ -2964,6 +2964,92 @@ textarea {
 .media-sound:hover,
 .media-fullscreen:hover { background: rgba(49, 91, 107, 0.92); }
 
+.media-fullscreen {
+  overflow: hidden;
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.media-fullscreen.active {
+  border-color: rgba(255, 255, 255, .7);
+  background: rgba(182, 111, 82, .92);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, .14);
+}
+
+.human-rope-icon {
+  width: 37px;
+  height: 30px;
+  overflow: visible;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .34));
+}
+
+.stretch-rope {
+  fill: none;
+  stroke: #f4e5d3;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-dasharray: 2.4 1.1;
+  transition: transform 240ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.rope-left { transform-origin: 13px 9px; }
+.rope-right { transform-origin: 29px 9px; }
+
+.stretch-rope-end {
+  fill: #d7a07c;
+  stroke: rgba(255, 255, 255, .9);
+  stroke-width: .7;
+}
+
+.stretch-head {
+  fill: #d7a07c;
+  stroke: rgba(255, 255, 255, .9);
+  stroke-width: .65;
+}
+
+.stretch-body {
+  fill: #f6fafb;
+  stroke: rgba(19, 32, 37, .64);
+  stroke-width: .65;
+  stroke-linejoin: round;
+}
+
+.stretch-arm,
+.stretch-leg {
+  fill: none;
+  stroke: #d7a07c;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transition: transform 240ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.arm-left { transform-origin: 17px 13px; }
+.arm-right { transform-origin: 25px 13px; }
+
+.media-fullscreen:hover .rope-left,
+.media-fullscreen.active .rope-left {
+  transform: translateX(-2px) scaleX(1.17);
+}
+
+.media-fullscreen:hover .rope-right,
+.media-fullscreen.active .rope-right {
+  transform: translateX(2px) scaleX(1.17);
+}
+
+.media-fullscreen:hover .arm-left,
+.media-fullscreen.active .arm-left { transform: rotate(7deg) translateX(-1px); }
+.media-fullscreen:hover .arm-right,
+.media-fullscreen.active .arm-right { transform: rotate(-7deg) translateX(1px); }
+
+.media-fullscreen:hover .human-rope-icon,
+.media-fullscreen.active .human-rope-icon {
+  animation: humanRopePull 620ms ease-in-out infinite alternate;
+}
+
+@keyframes humanRopePull {
+  from { transform: scaleX(.96) translateY(.4px); }
+  to { transform: scaleX(1.04) translateY(-.4px); }
+}
+
 .drum-sound-icon {
   width: 29px;
   height: 26px;
@@ -2987,6 +3073,10 @@ textarea {
 
 @keyframes drumBeat {
   to { transform: rotate(-4deg) translateY(1px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-fullscreen .human-rope-icon { animation: none; }
 }
 
 .media-carousel:fullscreen,

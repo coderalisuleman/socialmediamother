@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, Info, Link2, Maximize2, MessageCircle, Pencil, Play, Send, Square, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Info, Link2, MessageCircle, Pencil, Play, Send, Square, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useInView, useReducedMotion } from '../lib/hooks';
 import { postPath } from '../lib/routes';
@@ -25,6 +25,22 @@ function DrumSoundIcon({ soundOn }) {
       <path d="M7 12v10c0 3 20 3 20 0V12" />
       <path d="M9 17h16M12 14v10m10-10v10" />
       {soundOn && <g className="drum-sticks"><path d="m7 3 10 9M27 3 17 12" /><circle cx="7" cy="3" r="1.6" /><circle cx="27" cy="3" r="1.6" /></g>}
+    </svg>
+  );
+}
+
+function HumanRopeIcon({ expanded }) {
+  return (
+    <svg className={`human-rope-icon ${expanded ? 'is-expanded' : ''}`} viewBox="0 0 42 32" aria-hidden="true">
+      <path className="stretch-rope rope-left" d="M1 9h12" />
+      <path className="stretch-rope rope-right" d="M29 9h12" />
+      <circle className="stretch-rope-end" cx="2" cy="9" r="1.5" />
+      <circle className="stretch-rope-end" cx="40" cy="9" r="1.5" />
+      <circle className="stretch-head" cx="21" cy="6" r="4" />
+      <path className="stretch-body" d="M16 13c1-3 3-4 5-4s4 1 5 4l2 9-4 1-1-6v13h-4V17l-1 6-4-1 2-9Z" />
+      <path className="stretch-arm arm-left" d="m17 13-5-4" />
+      <path className="stretch-arm arm-right" d="m25 13 5-4" />
+      <path className="stretch-leg" d="m19 29-4 2m8-2 4 2" />
     </svg>
   );
 }
@@ -65,6 +81,7 @@ function VideoSlide({ item, active, inView }) {
 
 export function MediaCarousel({ media = [], short = false, preview = false, priority = false }) {
   const [index, setIndex] = useState(0);
+  const [fullscreen, setFullscreen] = useState(false);
   const [containerRef, inView] = useInView();
   const reducedMotion = useReducedMotion();
   const touchStart = useRef(null);
@@ -80,15 +97,38 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
     if (index >= media.length) setIndex(0);
   }, [index, media.length]);
 
+  useEffect(() => {
+    const update = () => setFullscreen(document.fullscreenElement === containerRef.current || document.webkitFullscreenElement === containerRef.current);
+    document.addEventListener('fullscreenchange', update);
+    document.addEventListener('webkitfullscreenchange', update);
+    return () => {
+      document.removeEventListener('fullscreenchange', update);
+      document.removeEventListener('webkitfullscreenchange', update);
+    };
+  }, [containerRef]);
+
   const move = (direction) => {
     if (!media.length) return;
     setIndex((value) => (value + direction + media.length) % media.length);
   };
 
-  const enterFullscreen = () => {
+  const toggleFullscreen = async () => {
     const node = containerRef.current;
-    if (node?.requestFullscreen) node.requestFullscreen().catch(() => {});
-    else node?.querySelector('video')?.webkitEnterFullscreen?.();
+    const active = document.fullscreenElement || document.webkitFullscreenElement;
+    try {
+      if (active) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else document.webkitExitFullscreen?.();
+      } else if (node?.requestFullscreen) {
+        await node.requestFullscreen();
+      } else if (node?.webkitRequestFullscreen) {
+        node.webkitRequestFullscreen();
+      } else {
+        node?.querySelector('video')?.webkitEnterFullscreen?.();
+      }
+    } catch {
+      // Browsers can reject fullscreen when the user has disabled it.
+    }
   };
 
   if (!current) return null;
@@ -125,7 +165,7 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
             </button>
           </>
         )}
-        {!preview && <button type="button" className="media-fullscreen" onClick={enterFullscreen} aria-label="View media full screen" title="Full screen"><Maximize2 size={20} /></button>}
+        {!preview && <button type="button" className={`media-fullscreen ${fullscreen ? 'active' : ''}`} onClick={toggleFullscreen} aria-label={fullscreen ? 'Exit full screen' : 'View media full screen'} title={fullscreen ? 'Exit full screen' : 'Full screen'}><HumanRopeIcon expanded={fullscreen} /></button>}
       </div>
       {media.length > 1 && (
         <div className="page-meter" aria-label={`Item ${index + 1} of ${media.length}`}>

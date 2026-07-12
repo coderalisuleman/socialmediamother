@@ -19,6 +19,8 @@ services:
         value: https://socialmediamother.onrender.com
       - key: MONGODB_URI
         sync: false
+      - key: ALLOW_MEMORY_STORAGE
+        value: "false"
       - key: JWT_SECRET
         generateValue: true
       - key: OTP_SECRET

@@ -1,6 +1,6 @@
 # Social Media Mother API
 
-Node/Express API with MongoDB/Mongoose and GridFS. If `MONGODB_URI` is blank in development, it starts an in-memory demo store with the exact same HTTP contract. Production refuses to start without MongoDB and a strong JWT secret.
+Node/Express API with MongoDB/Mongoose and GridFS. `MONGODB_URI` is required so every account, post, comment, reaction and upload is durable. The root `.env` is loaded regardless of the npm workspace directory, and the service fails fast instead of silently using temporary storage.
 
 The HTTP server uses Render's `PORT` value and explicitly binds to `HOST=0.0.0.0`, so the service is reachable outside its container. Local development uses port `5000` unless overridden.
 
@@ -13,7 +13,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Demo accounts use password `demo1234`: `@jasmine`, `@coderalisuleman`, and the one-letter account `@r`. Local email/phone OTP requests return a `devOtp`; production never returns it and requires AWS SES/SNS configuration.
+Local email/phone OTP requests can return a `devOtp`; production never returns it and requires AWS SES/SNS configuration. No default users or posts are seeded.
 
 ## Main API contract
 

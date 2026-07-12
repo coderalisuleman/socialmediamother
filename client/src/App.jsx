@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Compass, RefreshCw, Sparkles, X } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Compass, Sparkles, X } from 'lucide-react';
 import Nav from './components/Nav';
 import BottomDock from './components/BottomDock';
 import UploadModal from './components/UploadModal';
@@ -20,7 +20,6 @@ import {
   settingPath,
   uploadPath,
 } from './lib/routes';
-import { currentDemoUser, demoPeople, demoPosts, extraDemoPosts } from './data/demo';
 
 function readLocalUser() {
   try {
@@ -40,27 +39,17 @@ function normalizeUser(payload, fallback) {
   return normalizeUserShape(payload?.user || payload?.data?.user || (payload?.username ? payload : null) || fallback);
 }
 
-function withVisualFallback(items) {
-  return items.map((post, index) => {
-    if (post.type === 'text' || post.media?.length) return post;
-    const candidates = demoPosts.filter((demo) => demo.type === post.type && demo.media?.length);
-    const sample = candidates[index % Math.max(1, candidates.length)];
-    return sample ? { ...post, media: sample.media } : post;
-  });
-}
-
 export default function App() {
   const [route, setRoute] = useState(parseAppLocation);
   const [query, setQuery] = useState(() => parseAppLocation().query || '');
   const [feedMode, setFeedMode] = useState(() => parseAppLocation().feedMode || 'everyone');
   const [posts, setPosts] = useState([]);
-  const [people, setPeople] = useState(demoPeople);
+  const [people, setPeople] = useState([]);
   const [user, setUser] = useState(readLocalUser);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [cursor, setCursor] = useState(null);
   const [done, setDone] = useState(false);
-  const [demoMode, setDemoMode] = useState(false);
   const [followingFallback, setFollowingFallback] = useState(false);
   const [notice, setNotice] = useState('');
   const [modal, setModal] = useState(null);
@@ -109,12 +98,6 @@ export default function App() {
     navigate(path, { ...options, overlay: true });
   }, [navigate]);
 
-  const fallbackPosts = useMemo(() => {
-    if (feedMode !== 'following') return demoPosts;
-    const following = demoPosts.filter((post) => post.author?.isFollowing);
-    return following.length ? following : demoPosts;
-  }, [feedMode]);
-
   const loadFeed = useCallback(async () => {
     setLoading(true);
     setNotice('');
@@ -126,21 +109,19 @@ export default function App() {
         payload = normalizePostsResponse(await api.listPosts({ feed: 'everyone', limit: 5 }));
         setFollowingFallback(true);
       }
-      setPosts(withVisualFallback(payload.items));
+      setPosts(payload.items);
       setCursor(payload.nextCursor);
       setDone(!payload.nextCursor);
-      setDemoMode(false);
-    } catch {
-      setPosts(fallbackPosts);
-      setCursor('demo-next');
-      setDone(false);
-      setDemoMode(true);
+    } catch (error) {
+      setPosts([]);
+      setCursor(null);
+      setDone(true);
       setFollowingFallback(feedMode === 'following' && !user);
-      setNotice('The live garden is resting, so Mother is showing a beautiful local preview. Everything still works here.');
+      setNotice(error.message || 'The feed could not be loaded. Please refresh and try again.');
     } finally {
       setLoading(false);
     }
-  }, [fallbackPosts, feedMode, user]);
+  }, [feedMode, user]);
 
   useEffect(() => {
     loadFeed();
@@ -193,9 +174,21 @@ export default function App() {
     }
 
     if (route.kind === 'create-account') {
+      if (user) {
+        setModal(null);
+        setNotice('You already have an active account. Account-out before creating another one.');
+        navigate('/', { replace: true });
+        return () => { active = false; };
+      }
       setModal('create');
       document.title = 'Make your account | Mother';
     } else if (route.kind === 'account-in') {
+      if (user) {
+        setModal(null);
+        setNotice('You are already account-in.');
+        navigate('/', { replace: true });
+        return () => { active = false; };
+      }
       setModal('login');
       document.title = 'Account in | Mother';
     } else if (route.kind === 'upload') {
@@ -227,7 +220,7 @@ export default function App() {
       }
       const editing = route.kind === 'setting';
       setModal(null);
-      const localPerson = [user, ...people, ...posts.map((post) => post.author), ...demoPeople, currentDemoUser]
+      const localPerson = [user, ...people, ...posts.map((post) => post.author)]
         .find((person) => person?.username === route.username);
       if (localPerson) setSelectedPerson(localPerson);
       else setSelectedPerson((current) => current?.username === route.username ? current : null);
@@ -239,11 +232,11 @@ export default function App() {
         if (active && !localPerson) setNotice('That shared profile could not be found.');
       });
     } else if (route.kind === 'post') {
-      const localPost = [...posts, ...demoPosts, ...extraDemoPosts].find((post) => String(post.id) === String(route.postId));
-      if (localPost) setFocusedPost(withVisualFallback([localPost])[0]);
+      const localPost = posts.find((post) => String(post.id) === String(route.postId));
+      if (localPost) setFocusedPost(localPost);
       document.title = 'A shared post | Mother';
       api.getPost(route.postId).then((post) => {
-        if (active && post) setFocusedPost(withVisualFallback([post])[0]);
+        if (active && post) setFocusedPost(post);
       }).catch(() => {
         if (active && !localPost) setNotice('That shared post could not be found.');
       });
@@ -274,16 +267,10 @@ export default function App() {
     if (loadingMore || done) return;
     setLoadingMore(true);
     try {
-      if (demoMode) {
-        await new Promise((resolve) => window.setTimeout(resolve, 650));
-        setPosts((current) => [...current, ...extraDemoPosts.filter((item) => !current.some((post) => post.id === item.id))]);
-        setDone(true);
-      } else {
-        const payload = normalizePostsResponse(await api.listPosts({ feed: feedMode, cursor, limit: 5 }));
-        setPosts((current) => [...current, ...withVisualFallback(payload.items).filter((item) => !current.some((post) => post.id === item.id))]);
-        setCursor(payload.nextCursor);
-        setDone(!payload.nextCursor);
-      }
+      const payload = normalizePostsResponse(await api.listPosts({ feed: feedMode, cursor, limit: 5 }));
+      setPosts((current) => [...current, ...payload.items.filter((item) => !current.some((post) => post.id === item.id))]);
+      setCursor(payload.nextCursor);
+      setDone(!payload.nextCursor);
     } catch {
       setNotice('That next wave did not arrive. Check your connection and try once more.');
     } finally {
@@ -306,27 +293,8 @@ export default function App() {
       setPosts((current) => [post, ...current]);
       return;
     } catch (error) {
-      if (error.status) throw error;
+      throw error;
     }
-
-    const author = user || currentDemoUser;
-    const localPost = {
-      id: `local-${Date.now()}`,
-      ...values,
-      author,
-      createdAt: 'now',
-      media: values.files.map((file) => ({
-        type: file.type.startsWith('image/') ? 'image' : 'video',
-        src: URL.createObjectURL(file),
-        alt: file.name,
-      })),
-      link: values.links?.[0] || '',
-      hugs: 0,
-      throws: 0,
-      reaction: null,
-    };
-    setPosts((current) => [localPost, ...current]);
-    setNotice('Your post is placed in this preview. Connect the live server to keep it everywhere.');
   };
 
   const register = async (values) => {
@@ -526,7 +494,6 @@ export default function App() {
       {notice && (
         <div className="notice-bar" role="status">
           <Sparkles size={16} /> <span>{notice}</span>
-          {demoMode && <button type="button" onClick={loadFeed}><RefreshCw size={14} /> Retry live</button>}
           <button type="button" className="notice-close" onClick={() => setNotice('')} aria-label="Dismiss message"><X size={16} /></button>
         </div>
       )}
@@ -550,10 +517,10 @@ export default function App() {
           onPost={openPost}
           viewer={user}
           onRequireAuth={requireAccount}
-          fallbackPosts={[...posts, ...demoPosts, ...extraDemoPosts]}
+          fallbackPosts={posts}
         />
       ) : searchActive ? (
-        <SearchPanel query={query} people={people} posts={posts.length ? posts : demoPosts} onFollow={follow} onPerson={openPerson} onPost={openPost} viewer={user} onRequireAuth={requireAccount} />
+        <SearchPanel query={query} people={people} posts={posts} onFollow={follow} onPerson={openPerson} onPost={openPost} viewer={user} onRequireAuth={requireAccount} />
       ) : (
         <main className="home-layout" id="main-content">
           <section className="feed-section" aria-labelledby="feed-title">
@@ -563,7 +530,6 @@ export default function App() {
                 <h1 id="feed-title">{focusedPost ? focusedPost.name || `A ${focusedPost.type} post` : feedMode === 'everyone' ? 'Everyone’s every post' : 'The people I want to be with'}</h1>
                 <p>{focusedPost ? `Shared by @${focusedPost.author?.username}.` : followingFallback ? 'Until you choose your people, everyone keeps this space warm.' : feedMode === 'everyone' ? 'A changing mix, shaped by what you enjoy and what people are loving.' : 'Every format, only from the people you chose.'}</p>
               </div>
-              {demoMode && <span className="preview-chip">Preview garden</span>}
             </header>
 
             {loading && !focusedPost ? <FeedSkeleton /> : visiblePosts.length ? (

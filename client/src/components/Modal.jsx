@@ -4,6 +4,11 @@ import { X } from 'lucide-react';
 export default function Modal({ open, onClose, title, eyebrow, children, wide = false, className = '' }) {
   const titleId = useId();
   const panelRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -15,7 +20,7 @@ export default function Modal({ open, onClose, title, eyebrow, children, wide = 
     document.body.style.overflow = 'hidden';
 
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') onCloseRef.current?.();
       if (event.key !== 'Tab' || !panel) return;
       const nodes = [...panel.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])')];
       if (!nodes.length) return;
@@ -36,7 +41,7 @@ export default function Modal({ open, onClose, title, eyebrow, children, wide = 
       document.body.style.overflow = oldOverflow;
       previous?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   return (
@@ -62,4 +67,3 @@ export default function Modal({ open, onClose, title, eyebrow, children, wide = 
     </div>
   );
 }
-

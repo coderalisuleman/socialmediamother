@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlignLeft, ArrowDownToLine, Film, Image as ImageIcon, Link2, LoaderCircle, Plus, Smartphone, UploadCloud, Video } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { AlignLeft, ArrowDownToLine, ArrowLeft, CheckCircle2, Film, Image as ImageIcon, Link2, LoaderCircle, Plus, Smartphone, UploadCloud, Video } from 'lucide-react';
 import { useObjectUrls } from '../lib/hooks';
 import { optimizePhoto } from '../lib/media';
 import Modal from './Modal';
@@ -16,6 +16,7 @@ function DropField({ mode, files, setFiles }) {
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
+  const [droppedCount, setDroppedCount] = useState(0);
   const urls = useObjectUrls(files);
   const accept = mode === 'photo' ? 'image/*' : 'video/*';
   const previewMedia = urls.map((src, index) => ({
@@ -24,12 +25,19 @@ function DropField({ mode, files, setFiles }) {
     alt: files[index]?.name || `Selected ${mode}`,
   }));
 
-  const add = async (list) => {
+  useEffect(() => {
+    if (!droppedCount) return undefined;
+    const timer = window.setTimeout(() => setDroppedCount(0), 2600);
+    return () => window.clearTimeout(timer);
+  }, [droppedCount]);
+
+  const add = async (list, { dropped = false } = {}) => {
     const valid = [...list].filter((file) => mode === 'photo' ? file.type.startsWith('image/') : file.type.startsWith('video/'));
     setOptimizing(mode === 'photo' && valid.some((file) => file.size >= 450_000));
     try {
       const prepared = mode === 'photo' ? await Promise.all(valid.map(optimizePhoto)) : valid;
       setFiles((current) => [...current, ...prepared]);
+      if (dropped && prepared.length) setDroppedCount(prepared.length);
     } finally {
       setOptimizing(false);
     }
@@ -45,17 +53,18 @@ function DropField({ mode, files, setFiles }) {
         </button>
         <span className="or-badge">OR</span>
         <div
-          className={`file-choice drop-choice ${dragging ? 'dragging' : ''}`}
+          className={`file-choice drop-choice ${dragging ? 'dragging' : ''} ${droppedCount ? 'dropped' : ''}`}
           onDragEnter={(event) => { event.preventDefault(); setDragging(true); }}
           onDragOver={(event) => event.preventDefault()}
           onDragLeave={() => setDragging(false)}
-          onDrop={(event) => { event.preventDefault(); setDragging(false); add(event.dataTransfer.files); }}
+          onDrop={(event) => { event.preventDefault(); setDragging(false); add(event.dataTransfer.files, { dropped: true }); }}
         >
           <span><ArrowDownToLine size={26} /></span>
           <strong>Drop here</strong>
           <small>Release your collection into this card</small>
         </div>
       </div>
+      {droppedCount > 0 && <div className="drop-confirmation" role="status"><CheckCircle2 size={21} /><span><strong>{droppedCount} {droppedCount === 1 ? 'file' : 'files'} dropped</strong><small>Your upload is ready below.</small></span></div>}
       <input
         ref={inputRef}
         type="file"
@@ -97,8 +106,6 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const textareaRef = useRef(null);
-
-  const selected = useMemo(() => choices.find((choice) => choice.id === mode), [mode]);
 
   useEffect(() => {
     if (open) setMode(initialMode || null);
@@ -166,7 +173,7 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
   };
 
   return (
-    <Modal open={open} onClose={close} title={mode ? `Upload ${selected?.label.toLowerCase()}` : 'What are you bringing?'} eyebrow="Place something in Mother" wide className="upload-modal">
+    <Modal open={open} onClose={close} title="Upload" wide className="upload-modal">
       {!mode ? (
         <div className="upload-choices">
           {choices.map(({ id, label, detail: choiceDetail, icon: Icon }, index) => (
@@ -179,7 +186,7 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
         </div>
       ) : (
         <form className="upload-form" onSubmit={submit}>
-          <button type="button" className="back-link" onClick={() => chooseMode(null)} disabled={submitting}>← Choose another format</button>
+          <button type="button" className="back-link" onClick={() => chooseMode(null)} disabled={submitting}><ArrowLeft size={21} strokeWidth={2.6} /> Go back</button>
 
           {mode === 'text' ? (
             <div className="text-editor-wrap">
@@ -195,7 +202,6 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
               <button type="button" className="newline-button" onClick={insertNewline} title="Start a new line">
                 <ArrowDownToLine size={17} /> New line
               </button>
-              <small>Enter starts a new line. On mobile, the button above does too.</small>
             </div>
           ) : (
             <DropField mode={mode} files={files} setFiles={setFiles} />

@@ -43,7 +43,9 @@ async function request(path, options = {}) {
       : await response.text();
 
     if (!response.ok) {
-      const message = payload?.error?.message || payload?.message || (typeof payload?.error === 'string' ? payload.error : '') || `Request failed (${response.status})`;
+      const baseMessage = payload?.error?.message || payload?.message || (typeof payload?.error === 'string' ? payload.error : '') || `Request failed (${response.status})`;
+      const validationDetails = Array.isArray(payload?.error?.details) ? payload.error.details.filter(Boolean) : [];
+      const message = validationDetails.length ? `${baseMessage}: ${validationDetails.join('; ')}` : baseMessage;
       throw new ApiError(message, response.status, payload);
     }
     return payload;

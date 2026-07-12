@@ -13,7 +13,7 @@ function FeedSwitch({ feedMode, onFeedMode }) {
   );
 }
 
-export default function Nav({ query, onQuery, feedMode, onFeedMode, onHome, onCreate, onLogin, onLogout }) {
+export default function Nav({ query, onQuery, feedMode, onFeedMode, user, onHome, onCreate, onLogin, onLogout }) {
   return (
     <header className="top-shell">
       <nav className="top-nav" aria-label="Main navigation">
@@ -30,10 +30,15 @@ export default function Nav({ query, onQuery, feedMode, onFeedMode, onHome, onCr
             <input type="search" value={query} onChange={(event) => onQuery(event.target.value)} placeholder="Search..." autoComplete="off" />
             {query && <button type="button" onClick={() => onQuery('')} aria-label="Clear search"><X size={17} /></button>}
           </label>
-          <div className="account-actions" aria-label="Account actions">
-            <button type="button" className="nav-action" onClick={onCreate}>Account Create</button>
-            <button type="button" className="nav-action login-action" onClick={onLogin}>Account-in</button>
-            <button type="button" className="nav-action account-out-action" onClick={onLogout}>Account-out</button>
+          <div className={`account-actions ${user ? 'signed-in' : 'signed-out'}`} aria-label="Account actions">
+            {user ? (
+              <button type="button" className="nav-action account-out-action" onClick={onLogout}>Account-out</button>
+            ) : (
+              <>
+                <button type="button" className="nav-action" onClick={onCreate}>Account Create</button>
+                <button type="button" className="nav-action login-action" onClick={onLogin}>Account-in</button>
+              </>
+            )}
           </div>
         </div>
       </nav>

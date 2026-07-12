@@ -1,4 +1,5 @@
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { promises as fs } from 'node:fs';
 import express from 'express';
@@ -162,6 +163,12 @@ export const createApp = () => {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
+  app.use((req, res, next) => {
+    const supplied = String(req.get('x-request-id') || '').trim();
+    req.id = /^[a-zA-Z0-9_-]{8,100}$/.test(supplied) ? supplied : crypto.randomUUID();
+    res.set('X-Request-ID', req.id);
+    next();
+  });
 
   app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },

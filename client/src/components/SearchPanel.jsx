@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Search, Sparkles, UserPlus } from 'lucide-react';
 import { api } from '../lib/api';
 import { useDebouncedValue } from '../lib/hooks';
-import { contentTypeLabels } from '../data/demo';
 import { Avatar, FeedCard, FeedSkeleton, LoadMore } from './Feed';
 
 const filters = ['all', 'text', 'photo', 'video', 'short-video'];
+const contentTypeLabels = { all: 'All', text: 'Text', photo: 'Photo', video: 'Video', 'short-video': 'Short video' };
 
 function normalize(value) {
   return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();

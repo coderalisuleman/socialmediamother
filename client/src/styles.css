@@ -2863,6 +2863,165 @@ h3 {
   .relationship-list > div { grid-template-columns: 1fr; }
 }
 
+/* Reliable form focus, upload feedback and immersive media controls. */
+textarea {
+  resize: none !important;
+}
+
+.account-actions.signed-in {
+  grid-template-columns: max-content;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 1px solid rgba(59, 145, 182, 0.28);
+  border-radius: 11px;
+  background: var(--teal-pale);
+  color: var(--teal-dark);
+  font-size: 0.78rem;
+}
+
+.back-link svg {
+  flex: 0 0 auto;
+  width: 21px;
+  height: 21px;
+}
+
+.drop-choice.dropped {
+  border-color: var(--clay);
+  background: linear-gradient(145deg, var(--teal-pale), #fff, var(--clay-pale));
+  animation: droppedPulse 680ms ease;
+}
+
+.drop-confirmation {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 11px;
+  padding: 12px 14px;
+  border: 1px solid rgba(59, 145, 182, 0.3);
+  border-radius: 13px;
+  background: linear-gradient(100deg, var(--teal-pale), #fff 52%, var(--clay-pale));
+  color: var(--teal-dark);
+  box-shadow: var(--shadow-sm);
+  animation: dropConfirmation 380ms cubic-bezier(.2,.8,.2,1) both;
+}
+
+.drop-confirmation > svg { flex: 0 0 auto; color: var(--clay-dark); }
+.drop-confirmation strong,
+.drop-confirmation small { display: block; }
+.drop-confirmation strong { font-size: 0.76rem; }
+.drop-confirmation small { margin-top: 2px; color: var(--ink-soft); font-size: 0.64rem; }
+
+@keyframes droppedPulse {
+  50% { transform: scale(.985); box-shadow: 0 0 0 6px rgba(59, 145, 182, 0.1); }
+}
+
+@keyframes dropConfirmation {
+  from { opacity: 0; transform: translateY(-9px) scale(.98); }
+}
+
+.media-play {
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  left: 50%;
+  width: 54px;
+  height: 54px;
+  background: rgba(19, 32, 37, 0.68);
+  transform: translate(-50%, -50%);
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.media-play:hover {
+  background: rgba(19, 32, 37, 0.86);
+  transform: translate(-50%, -50%) scale(1.07);
+}
+
+.media-sound,
+.media-fullscreen {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  width: 45px;
+  height: 45px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 13px;
+  background: rgba(19, 32, 37, 0.66);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(9px);
+  place-items: center;
+}
+
+.media-sound { top: 13px; right: 13px; }
+.media-fullscreen { top: 50%; right: 13px; transform: translateY(-50%); }
+.media-sound:hover,
+.media-fullscreen:hover { background: rgba(49, 91, 107, 0.92); }
+
+.drum-sound-icon {
+  width: 29px;
+  height: 26px;
+  overflow: visible;
+  fill: rgba(255, 255, 255, 0.18);
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.drum-sticks {
+  fill: currentColor;
+  stroke-width: 2.2;
+  transform-origin: center;
+  animation: drumBeat 700ms ease-in-out infinite alternate;
+}
+
+.media-sound.muted .drum-sound-icon { opacity: .72; }
+.media-sound.sound-on { border-color: rgba(255, 255, 255, .55); background: rgba(182, 111, 82, .84); }
+
+@keyframes drumBeat {
+  to { transform: rotate(-4deg) translateY(1px); }
+}
+
+.media-carousel:fullscreen,
+.media-carousel:-webkit-full-screen {
+  display: grid;
+  width: 100vw;
+  height: 100vh;
+  padding: 0;
+  background: #071014;
+  place-items: center;
+}
+
+.media-carousel:fullscreen .media-stage,
+.media-carousel:-webkit-full-screen .media-stage {
+  width: 100%;
+  height: 100%;
+  max-height: 100vh;
+}
+
+.media-carousel:fullscreen .media-stage > img,
+.media-carousel:fullscreen .media-stage video,
+.media-carousel:-webkit-full-screen .media-stage > img,
+.media-carousel:-webkit-full-screen .media-stage video {
+  object-fit: contain;
+}
+
+@media (max-width: 760px) {
+  .account-actions.signed-in { grid-template-columns: minmax(0, 1fr); }
+  .media-sound,
+  .media-fullscreen { width: 41px; height: 41px; border-radius: 12px; }
+  .media-fullscreen { right: 8px; }
+  .media-sound { top: 8px; right: 8px; }
+  .media-play { width: 50px; height: 50px; }
+}
+
 /* Interaction clarity, full-page profiles and persistent post actions. */
 * {
   scrollbar-width: thin;

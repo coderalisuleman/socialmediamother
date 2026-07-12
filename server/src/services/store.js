@@ -1,5 +1,4 @@
 import crypto from 'node:crypto';
-import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import { config } from '../config.js';
 import { User } from '../models/User.js';
@@ -29,7 +28,10 @@ const comparableId = (value) => String(value?._id || value?.id || value);
 
 const asPlainComment = (document) => {
   if (!document) return null;
-  const value = typeof document.toObject === 'function' ? document.toObject() : clone(document);
+  // Keep BSON ObjectIds intact until they are normalized to strings below.
+  // structuredClone turns ObjectId instances from lean queries into plain
+  // objects, which previously broke every authenticated write after signup.
+  const value = typeof document.toObject === 'function' ? document.toObject() : { ...document };
   value.id = comparableId(value);
   value.post = comparableId(value.post);
   delete value._id;
@@ -40,7 +42,7 @@ const asPlainComment = (document) => {
 
 const asPlainUser = (document) => {
   if (!document) return null;
-  const value = typeof document.toObject === 'function' ? document.toObject() : clone(document);
+  const value = typeof document.toObject === 'function' ? document.toObject() : { ...document };
   value.id = comparableId(value);
   delete value._id;
   delete value.__v;
@@ -49,7 +51,7 @@ const asPlainUser = (document) => {
 
 const asPlainPost = (document) => {
   if (!document) return null;
-  const value = typeof document.toObject === 'function' ? document.toObject() : clone(document);
+  const value = typeof document.toObject === 'function' ? document.toObject() : { ...document };
   value.id = comparableId(value);
   delete value._id;
   delete value.__v;
@@ -80,60 +82,6 @@ const memoryUser = (data) => ({
   createdAt: nowIso(),
   updatedAt: nowIso()
 });
-
-const seedMemory = async () => {
-  if (memory.users.size) return;
-  const passwordHash = await bcrypt.hash('demo1234', 10);
-  const jasmine = memoryUser({
-    fullName: 'Jasmine Noor', username: 'jasmine', passwordHash, gender: 'female',
-    bio: 'Design, thoughtful technology, and kind communities.'
-  });
-  const ali = memoryUser({
-    fullName: 'Coder Ali Suleman', username: 'coderalisuleman', passwordHash, gender: 'male',
-    bio: 'Owner of Social Media Mother.'
-  });
-  const river = memoryUser({
-    fullName: 'River', username: 'r', passwordHash, gender: 'other',
-    bio: 'A one-letter username, just as promised.'
-  });
-  [jasmine, ali, river].forEach((user) => memory.users.set(user.id, user));
-
-  const samples = [
-    {
-      author: jasmine.id, type: 'video',
-      nameIt: 'Social Media Mother web app launch',
-      detail: 'A first look at a kinder place for sharing ideas.',
-      links: ['https://youtube.com/@coderalisuleman']
-    },
-    {
-      author: ali.id, type: 'text',
-      text: 'A free place where anyone, anywhere can post their thoughts.\nWelcome to the beginning.',
-      nameIt: '', detail: '', links: []
-    },
-    {
-      author: river.id, type: 'photo',
-      nameIt: 'A quiet blue morning', detail: 'Tiny moments can carry big ideas.', links: []
-    },
-    {
-      author: jasmine.id, type: 'short-video',
-      nameIt: 'Make something gentle today', detail: 'A short creative reminder.', links: []
-    }
-  ];
-
-  samples.forEach((sample, index) => {
-    const date = new Date(Date.now() - index * 22 * 60 * 1000).toISOString();
-    const post = {
-      id: makeId(), ...sample, media: [], hugCount: Math.max(0, 18 - index * 3),
-      throwCount: index === 3 ? 1 : 0, viewCount: 120 - index * 19,
-      deletedAt: null, createdAt: date, updatedAt: date
-    };
-    memory.posts.set(post.id, post);
-  });
-};
-
-export const initializeStore = async () => {
-  if (config.storageMode === 'memory') await seedMemory();
-};
 
 export const storeMode = () => config.storageMode;
 

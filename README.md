@@ -37,7 +37,7 @@ Private account, settings, and upload links are excluded from search engines. Pu
 4. Run `npm run dev`.
 5. Open `http://localhost:5173`.
 
-With `MONGODB_URI` blank, the API runs in an in-memory demo mode so the full interface can be explored immediately. Add a MongoDB Atlas connection string to persist users, posts, follows, reactions, OTP challenges, and media.
+`MONGODB_URI` is required in development and production. The server reads the root `.env` even when npm workspaces launch it from `server/`, so users, posts, follows, reactions, comments, OTP challenges, and GridFS media always use durable MongoDB storage. It fails fast instead of silently falling back to temporary demo data.
 
 ## Account verification
 

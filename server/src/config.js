@@ -1,4 +1,13 @@
-import 'dotenv/config';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { config as loadEnv } from 'dotenv';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// npm workspaces launch this package with `server/` as the working directory.
+// Resolve env files from this module so VS Code, the root scripts and Render all
+// receive the same configuration regardless of the current working directory.
+loadEnv({ path: path.resolve(__dirname, '../../.env'), override: false, quiet: true });
+loadEnv({ path: path.resolve(__dirname, '../.env'), override: false, quiet: true });
 
 const asPositiveInt = (value, fallback) => {
   const parsed = Number.parseInt(value ?? '', 10);
@@ -11,9 +20,14 @@ const isRender = process.env.RENDER === 'true';
 // even if NODE_ENV was accidentally overridden in the dashboard.
 const isProduction = nodeEnv === 'production' || isRender;
 const mongoUri = process.env.MONGODB_URI?.trim() || '';
+const allowMemoryStorage = process.env.ALLOW_MEMORY_STORAGE === 'true';
 
 if (isProduction && !mongoUri) {
   throw new Error('MONGODB_URI is required in production and on Render');
+}
+
+if (!mongoUri && !allowMemoryStorage) {
+  throw new Error('MONGODB_URI is required. Add it to the root .env file; temporary memory storage is disabled.');
 }
 
 if (isProduction && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)) {
@@ -27,6 +41,7 @@ export const config = Object.freeze({
   host: process.env.HOST?.trim() || '0.0.0.0',
   port: asPositiveInt(process.env.PORT, 5000),
   mongoUri,
+  allowMemoryStorage,
   storageMode: mongoUri ? 'mongodb' : 'memory',
   publicUrl: (
     process.env.PUBLIC_URL

@@ -1,22 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { injectMetadata, metadataForRoute } from '../app.js';
-import { initializeStore, listSitemapEntities } from '../services/store.js';
 import { classifyPagePath } from './publicRoutes.js';
 
-await initializeStore();
-
-test('creates canonical public metadata for friendly profile and post routes', async () => {
-  const profile = await metadataForRoute(classifyPagePath('/jasmine'));
-  assert.equal(profile.url, 'https://socialmediamother.onrender.com/jasmine');
-  assert.equal(profile.type, 'profile');
-  assert.match(profile.robots, /^index/);
-
-  const entries = await listSitemapEntities();
-  const post = await metadataForRoute(classifyPagePath(`/post/${entries.posts[0].id}`));
-  assert.equal(post.url, `https://socialmediamother.onrender.com/post/${entries.posts[0].id}`);
-  assert.equal(post.type, 'article');
-  assert.match(post.robots, /^index/);
+test('creates canonical public metadata for the real home feed', async () => {
+  const home = await metadataForRoute(classifyPagePath('/'));
+  assert.equal(home.url, 'https://socialmediamother.onrender.com/');
+  assert.equal(home.type, 'website');
+  assert.match(home.robots, /^index/);
 });
 
 test('keeps account, settings, and upload routes out of search results', async () => {

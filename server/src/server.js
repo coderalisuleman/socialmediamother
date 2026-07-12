@@ -1,10 +1,8 @@
 import { config } from './config.js';
 import { connectDatabase, disconnectDatabase } from './db.js';
-import { initializeStore } from './services/store.js';
 import { createApp } from './app.js';
 
 const database = await connectDatabase();
-await initializeStore();
 const app = createApp();
 const server = app.listen(config.port, config.host, () => {
   console.log(`Social Media Mother API listening on http://${config.host}:${config.port} (${database.mode})`);

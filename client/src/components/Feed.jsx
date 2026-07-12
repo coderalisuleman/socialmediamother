@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, Info, Link2, MessageCircle, Pause, Pencil, Play, Send, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Info, Link2, Maximize2, MessageCircle, Pencil, Play, Send, Square, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useInView, useReducedMotion } from '../lib/hooks';
 import { postPath } from '../lib/routes';
@@ -18,15 +18,28 @@ export function Avatar({ person, size = 'medium' }) {
   );
 }
 
+function DrumSoundIcon({ soundOn }) {
+  return (
+    <svg className="drum-sound-icon" viewBox="0 0 34 30" aria-hidden="true">
+      <ellipse cx="17" cy="12" rx="10" ry="4" />
+      <path d="M7 12v10c0 3 20 3 20 0V12" />
+      <path d="M9 17h16M12 14v10m10-10v10" />
+      {soundOn && <g className="drum-sticks"><path d="m7 3 10 9M27 3 17 12" /><circle cx="7" cy="3" r="1.6" /><circle cx="27" cy="3" r="1.6" /></g>}
+    </svg>
+  );
+}
+
 function VideoSlide({ item, active, inView }) {
   const videoRef = useRef(null);
   const [paused, setPaused] = useState(false);
+  const [muted, setMuted] = useState(true);
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+    video.muted = muted;
     if (active && inView && !paused) video.play().catch(() => {});
     else video.pause();
-  }, [active, inView, paused]);
+  }, [active, inView, muted, paused]);
 
   return (
     <div className="video-wrap">
@@ -34,16 +47,18 @@ function VideoSlide({ item, active, inView }) {
         ref={videoRef}
         src={item.src}
         poster={item.poster}
-        muted
+        muted={muted}
         loop
         playsInline
         preload="metadata"
         aria-label={item.alt || 'Post video'}
       />
-      <button type="button" className="media-play" onClick={() => setPaused((value) => !value)} aria-label={paused ? 'Play video' : 'Pause video'}>
-        {paused ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}
+      <button type="button" className="media-play" onClick={() => setPaused((value) => !value)} aria-label={paused ? 'Play video' : 'Stop video'}>
+        {paused ? <Play size={22} fill="currentColor" /> : <Square size={20} fill="currentColor" />}
       </button>
-      <span className="muted-chip">Muted</span>
+      <button type="button" className={`media-sound ${muted ? 'muted' : 'sound-on'}`} onClick={() => setMuted((value) => !value)} aria-label={muted ? 'Turn sound on' : 'Mute video'} title={muted ? 'Turn sound on' : 'Mute video'}>
+        <DrumSoundIcon soundOn={!muted} />
+      </button>
     </div>
   );
 }
@@ -68,6 +83,12 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
   const move = (direction) => {
     if (!media.length) return;
     setIndex((value) => (value + direction + media.length) % media.length);
+  };
+
+  const enterFullscreen = () => {
+    const node = containerRef.current;
+    if (node?.requestFullscreen) node.requestFullscreen().catch(() => {});
+    else node?.querySelector('video')?.webkitEnterFullscreen?.();
   };
 
   if (!current) return null;
@@ -104,6 +125,7 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
             </button>
           </>
         )}
+        {!preview && <button type="button" className="media-fullscreen" onClick={enterFullscreen} aria-label="View media full screen" title="Full screen"><Maximize2 size={20} /></button>}
       </div>
       {media.length > 1 && (
         <div className="page-meter" aria-label={`Item ${index + 1} of ${media.length}`}>

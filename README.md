@@ -84,3 +84,6 @@ Copyright © 2026 Vibe Coder Ali Suleman. All rights reserved.
 
 e ->
 mabs ....
+problems to fix after 21 july token reset
+1. if user want to delete there any post format then also show to the on thier own post format only the trash icon on which when they click they see the delete and cancel button on delete they can delete it
+2. when they are uploading so if they want to pasue it or cancel it so allow them ( as now users are facing problem of they cant able to do it )

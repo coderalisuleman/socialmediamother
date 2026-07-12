@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { AlignLeft, ArrowDownToLine, ArrowLeft, CheckCircle2, Film, Image as ImageIcon, Link2, LoaderCircle, Plus, Smartphone, UploadCloud, Video } from 'lucide-react';
 import { useObjectUrls } from '../lib/hooks';
 import { optimizePhoto } from '../lib/media';
@@ -12,7 +12,7 @@ const choices = [
   { id: 'short-video', label: 'Short video', detail: 'Vertical, quick and in motion', icon: Smartphone },
 ];
 
-function DropField({ mode, files, setFiles }) {
+const DropField = memo(function DropField({ mode, files, setFiles }) {
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
@@ -94,7 +94,7 @@ function DropField({ mode, files, setFiles }) {
       )}
     </div>
   );
-}
+});
 
 export default function UploadModal({ open, onClose, onCreate, initialMode = null, onModeChange }) {
   const [mode, setMode] = useState(null);
@@ -211,7 +211,7 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
             <div className="post-fields">
               <label>
                 <span>Name it <b>must fill</b></span>
-                <input value={name} onChange={(event) => setName(event.target.value)} required maxLength="120" placeholder="What should people call this?" />
+                <input value={name} onChange={(event) => setName(event.target.value)} required maxLength="120" placeholder="What should people call this?" autoFocus />
               </label>
               <label>
                 <span>Detail it <em>optional</em></span>

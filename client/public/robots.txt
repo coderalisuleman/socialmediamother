@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://socialmediamother.onrender.com/sitemap.xml

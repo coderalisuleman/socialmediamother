@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: social-media-mother
+    runtime: node
+    plan: free
+    region: singapore
+    autoDeployTrigger: commit
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: PUBLIC_URL
+        value: https://socialmediamother.onrender.com
+      - key: CLIENT_ORIGIN
+        value: https://socialmediamother.onrender.com
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: OTP_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: OTP_TTL_MINUTES
+        value: "10"
+      - key: AWS_REGION
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_SES_FROM_EMAIL
+        sync: false
+      - key: AWS_SNS_ORIGINATION_NUMBER
+        sync: false
+      - key: MAX_UPLOAD_MB
+        value: "250"
+      - key: MAX_FILES_PER_POST
+        value: "20"

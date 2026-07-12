@@ -1,0 +1,45 @@
+import 'dotenv/config';
+
+const asPositiveInt = (value, fallback) => {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const nodeEnv = process.env.NODE_ENV || 'development';
+const isProduction = nodeEnv === 'production';
+const mongoUri = process.env.MONGODB_URI?.trim() || '';
+
+if (isProduction && !mongoUri) {
+  throw new Error('MONGODB_URI is required when NODE_ENV=production');
+}
+
+if (isProduction && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)) {
+  throw new Error('A JWT_SECRET of at least 32 characters is required in production');
+}
+
+export const config = Object.freeze({
+  nodeEnv,
+  isProduction,
+  host: process.env.HOST?.trim() || '0.0.0.0',
+  port: asPositiveInt(process.env.PORT, 5000),
+  mongoUri,
+  storageMode: mongoUri ? 'mongodb' : 'memory',
+  publicUrl: (process.env.PUBLIC_URL || 'https://socialmediamother.onrender.com').trim().replace(/\/$/, ''),
+  clientOrigins: (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+  jwtSecret: process.env.JWT_SECRET || 'local-only-social-media-mother-jwt-secret',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  otpSecret: process.env.OTP_SECRET || process.env.JWT_SECRET || 'local-only-social-media-mother-otp-secret',
+  otpTtlMinutes: asPositiveInt(process.env.OTP_TTL_MINUTES, 10),
+  aws: {
+    region: process.env.AWS_REGION?.trim() || '',
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID?.trim() || '',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY?.trim() || '',
+    sesFromEmail: process.env.AWS_SES_FROM_EMAIL?.trim() || '',
+    snsOriginationNumber: process.env.AWS_SNS_ORIGINATION_NUMBER?.trim() || ''
+  },
+  maxUploadBytes: asPositiveInt(process.env.MAX_UPLOAD_MB, 250) * 1024 * 1024,
+  maxFilesPerPost: Math.min(asPositiveInt(process.env.MAX_FILES_PER_POST, 20), 50)
+});

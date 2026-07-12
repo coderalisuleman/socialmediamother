@@ -1,0 +1,33 @@
+{
+  "name": "social-media-mother-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "API for Social Media Mother",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "check": "node --check src/server.js && node --check src/app.js && node --test src/**/*.test.js",
+    "test": "node --test src/**/*.test.js",
+    "test:routes": "node scripts/production-route-smoke.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ses": "^3.840.0",
+    "@aws-sdk/client-sns": "^3.840.0",
+    "bcryptjs": "^3.0.2",
+    "compression": "^1.8.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.16.1",
+    "morgan": "^1.10.0",
+    "multer": "^2.0.1"
+  }
+}

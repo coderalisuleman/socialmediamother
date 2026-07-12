@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 
-process.env.NODE_ENV = 'production';
+// Reproduce the exact dashboard mistake that caused Render to return the API
+// 404 at `/`: NODE_ENV was manually set to development. RENDER=true must still
+// make the hosted service serve the production Vite build.
+process.env.NODE_ENV = 'development';
+process.env.RENDER = 'true';
+process.env.RENDER_EXTERNAL_URL = 'https://socialmediamother.onrender.com';
+delete process.env.PUBLIC_URL;
 process.env.HOST = '0.0.0.0';
 process.env.MONGODB_URI ||= 'mongodb://127.0.0.1:1/production-route-smoke';
 process.env.JWT_SECRET ||= 'production-route-smoke-secret-longer-than-thirty-two-characters';
@@ -14,6 +20,10 @@ const server = createApp().listen(0, config.host);
 await once(server, 'listening');
 
 assert.equal(config.host, '0.0.0.0');
+assert.equal(config.nodeEnv, 'development');
+assert.equal(config.isRender, true);
+assert.equal(config.isProduction, true);
+assert.equal(config.publicUrl, 'https://socialmediamother.onrender.com');
 assert.equal(server.address().address, '0.0.0.0');
 
 const origin = `http://127.0.0.1:${server.address().port}`;
@@ -61,7 +71,7 @@ try {
   assert.match(robots.body, /Disallow: \/createaccount/);
   assert.match(robots.body, /Disallow: \/\*\/upload/);
 
-  console.log('Production friendly-route smoke test passed.');
+  console.log('Render-hosted friendly-route smoke test passed.');
 } finally {
   server.close();
   await once(server, 'close');

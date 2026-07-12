@@ -58,6 +58,17 @@ Blank AWS values do not crash the app; the interface explains that the selected 
 
 The Vite production build is served by the same Express service, keeping deployment and same-origin security simple. Render's filesystem is ephemeral, so uploads are streamed to MongoDB/GridFS rather than written to local disk.
 
+### If Render shows `No route matches GET /`
+
+Use the exact environment-variable names from `render.yaml`:
+
+- Set `NODE_ENV` to `production` (or remove the manual override and let Render provide its production default).
+- Rename `PUBLIC_UR` to `PUBLIC_URL`.
+- Rename `JWT_EXPIRES` to `JWT_EXPIRES_IN`.
+- You can remove a manually added `PORT`; Render supplies it automatically. Keep `HOST=0.0.0.0`.
+
+The server also detects Render through its built-in `RENDER=true` value, so a future accidental `NODE_ENV=development` override will no longer make the website disappear behind an API 404.
+
 ## Practical scaling note
 
 GridFS honors the MongoDB-only architecture and works well for an MVP, but video can consume a free Atlas allowance quickly. Before large commercial scale, keep the post/social collections in MongoDB and consider moving media bytes to an object-storage/CDN pipeline with transcoding, posters, moderation, and signed uploads. The API's media boundary is isolated so that change can be made without redesigning accounts, feeds, or search.

@@ -4,7 +4,7 @@ import Nav from './components/Nav';
 import BottomDock from './components/BottomDock';
 import UploadModal from './components/UploadModal';
 import { CreateAccountModal, LoginModal } from './components/AuthModals';
-import ProfileModal from './components/ProfileModal';
+import ProfilePage from './components/ProfileModal';
 import SearchPanel from './components/SearchPanel';
 import SiteFooter from './components/SiteFooter';
 import { EmptyFeed, FeedCard, FeedSkeleton, LoadMore } from './components/Feed';
@@ -67,12 +67,13 @@ export default function App() {
   const [profileEditing, setProfileEditing] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [focusedPost, setFocusedPost] = useState(null);
+  const [accountCreated, setAccountCreated] = useState(false);
 
   const navigate = useCallback((path, { replace = false, overlay = false } = {}) => {
     const previousPath = currentUrlPath();
     const previousState = window.history.state || {};
     const currentRoute = parseAppLocation();
-    const currentRouteIsOverlay = ['create-account', 'account-in', 'profile', 'setting', 'upload'].includes(currentRoute.kind);
+    const currentRouteIsOverlay = ['create-account', 'account-in', 'upload'].includes(currentRoute.kind);
     const directOverlay = Boolean(previousState.motherDirectOverlay || (!previousState.motherOverlay && currentRouteIsOverlay));
     const state = overlay ? {
       motherOverlay: true,
@@ -163,6 +164,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!accountCreated) return undefined;
+    const timer = window.setTimeout(() => setAccountCreated(false), 2600);
+    return () => window.clearTimeout(timer);
+  }, [accountCreated]);
+
+  useEffect(() => {
     const onPopState = () => setRoute(parseAppLocation());
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -219,12 +226,12 @@ export default function App() {
         return () => { active = false; };
       }
       const editing = route.kind === 'setting';
+      setModal(null);
       const localPerson = [user, ...people, ...posts.map((post) => post.author), ...demoPeople, currentDemoUser]
         .find((person) => person?.username === route.username);
       if (localPerson) setSelectedPerson(localPerson);
       else setSelectedPerson((current) => current?.username === route.username ? current : null);
       setProfileEditing(editing);
-      setModal('profile');
       document.title = `${editing ? 'Settings' : `@${route.username}`} | Mother`;
       api.getUser(route.username).then((person) => {
         if (active && person) setSelectedPerson(person);
@@ -332,6 +339,8 @@ export default function App() {
     if (!nextUser) throw new Error('The account response was incomplete.');
     setUser(nextUser);
     saveLocalUser(nextUser);
+    setAccountCreated(true);
+    navigate('/');
   };
 
   const login = async (values) => {
@@ -401,7 +410,7 @@ export default function App() {
   const openPerson = (person) => {
     if (!person?.username) return;
     setSelectedPerson(person);
-    openOverlay(profilePath(person.username));
+    navigate(profilePath(person.username));
   };
 
   const openMe = (edit = false) => {
@@ -410,7 +419,7 @@ export default function App() {
       return;
     }
     setSelectedPerson(user);
-    openOverlay(edit ? settingPath(user.username) : profilePath(user.username));
+    navigate(edit ? settingPath(user.username) : profilePath(user.username));
   };
 
   const updateAvatar = async (file) => {
@@ -487,7 +496,7 @@ export default function App() {
   const changeProfileEditing = (editing) => {
     const username = selectedPerson?.username || user?.username;
     if (!username) return;
-    openOverlay(editing ? settingPath(username) : profilePath(username));
+    navigate(editing ? settingPath(username) : profilePath(username));
   };
 
   const openPost = (post) => {
@@ -497,6 +506,7 @@ export default function App() {
 
   const searchActive = query.trim().length > 0;
   const visiblePosts = focusedPost ? [focusedPost] : posts;
+  const profileActive = ['profile', 'setting'].includes(route.kind);
 
   return (
     <div className="app-shell" id="top">
@@ -521,7 +531,28 @@ export default function App() {
         </div>
       )}
 
-      {searchActive ? (
+      {accountCreated && (
+        <div className="account-created-layer" role="status" aria-live="assertive">
+          <div className="account-created-card"><span>✓</span><strong>Account is created</strong><small>You are now on the main page.</small></div>
+        </div>
+      )}
+
+      {profileActive ? (
+        <ProfilePage
+          person={selectedPerson}
+          isOwn={Boolean(user && (String(selectedPerson?.id || '') === String(user.id || '') || selectedPerson?.username === user.username))}
+          startEditing={profileEditing}
+          onAvatar={updateAvatar}
+          onDeleteAvatar={deleteAvatar}
+          onFollow={follow}
+          onEditingChange={changeProfileEditing}
+          onPerson={openPerson}
+          onPost={openPost}
+          viewer={user}
+          onRequireAuth={requireAccount}
+          fallbackPosts={[...posts, ...demoPosts, ...extraDemoPosts]}
+        />
+      ) : searchActive ? (
         <SearchPanel query={query} people={people} posts={posts.length ? posts : demoPosts} onFollow={follow} onPerson={openPerson} onPost={openPost} viewer={user} onRequireAuth={requireAccount} />
       ) : (
         <main className="home-layout" id="main-content">
@@ -580,20 +611,6 @@ export default function App() {
         }}
         onSwitchCreate={() => openOverlay('/createaccount', { replace: true })}
         currentUser={user}
-      />
-      <ProfileModal
-        open={modal === 'profile'}
-        onClose={closeModal}
-        person={selectedPerson}
-        isOwn={Boolean(user && (
-          String(selectedPerson?.id || '') === String(user.id || '')
-          || selectedPerson?.username === user.username
-        ))}
-        startEditing={profileEditing}
-        onAvatar={updateAvatar}
-        onDeleteAvatar={deleteAvatar}
-        onFollow={follow}
-        onEditingChange={changeProfileEditing}
       />
     </div>
   );

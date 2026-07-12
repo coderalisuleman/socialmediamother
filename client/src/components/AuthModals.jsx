@@ -4,7 +4,6 @@ import { getCountries, getCountryCallingCode, getExampleNumber, parsePhoneNumber
 import mobileExamples from 'libphonenumber-js/mobile/examples';
 import { api } from '../lib/api';
 import Modal from './Modal';
-import { MissionNote } from './SiteFooter';
 
 function countryFlag(code) {
   return code.replace(/./g, (character) => String.fromCodePoint(127397 + character.charCodeAt()));
@@ -169,7 +168,7 @@ export function CreateAccountModal({ open, onClose, onRegister, onSwitchLogin })
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Make your account" eyebrow="Your own place in Mother" wide className="auth-modal">
+    <Modal open={open} onClose={onClose} title="Make your account" eyebrow="Creating your account" wide className="auth-modal">
       <form className="auth-form" onSubmit={submit}>
         <div className="field-grid two">
           <label>
@@ -177,7 +176,7 @@ export function CreateAccountModal({ open, onClose, onRegister, onSwitchLogin })
             <div className="input-with-icon"><UserRound size={17} /><input value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" required placeholder="Your full name" /></div>
           </label>
           <label>
-            <span>Username <small>lowercase, one letter is enough</small></span>
+            <span>Username</span>
             <div className="username-input"><b>@</b><input value={username} onChange={(event) => setUsername(event.target.value.toLowerCase().replace(/[^a-z]/g, ''))} pattern="[a-z]{1,40}" minLength="1" maxLength="40" autoComplete="username" required placeholder="you" /></div>
           </label>
         </div>
@@ -249,11 +248,10 @@ export function CreateAccountModal({ open, onClose, onRegister, onSwitchLogin })
 
         {error && <p className="form-error" role="alert">{error}</p>}
         <button type="submit" className="primary-button full-button" disabled={loading}>
-          {loading ? <><LoaderCircle className="spin" size={17} /> Making your place…</> : 'Create my account'}
+          {loading ? <><LoaderCircle className="spin" size={17} /> Creating your account…</> : 'Create my account'}
         </button>
-        <button type="button" className="switch-auth" onClick={onSwitchLogin}>Already have a place here? <strong>Account in</strong></button>
+        <button type="button" className="switch-auth" onClick={onSwitchLogin}>Already have an account? <strong>Account in</strong></button>
       </form>
-      <MissionNote />
     </Modal>
   );
 }
@@ -295,7 +293,6 @@ export function LoginModal({ open, onClose, onLogin, onSwitchCreate, currentUser
         </button>
         <button type="button" className="switch-auth" onClick={onSwitchCreate}>New here? <strong>Make your account</strong></button>
       </form>
-      <MissionNote />
     </Modal>
   );
 }

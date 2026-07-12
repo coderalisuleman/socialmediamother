@@ -10,25 +10,30 @@ export function BrandMark({ small = false }) {
 
 export function HugIcon({ filled = false }) {
   return (
-    <svg viewBox="0 0 48 48" aria-hidden="true" className="reaction-art">
-      <circle cx="17" cy="12" r="6" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.6" />
-      <circle cx="31" cy="12" r="6" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.6" />
-      <path d="M11 39v-9c0-7 4-11 10-11h6c6 0 10 4 10 11v9" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
-      <path d="M8 25c4 1 8 5 10 10M40 25c-4 1-8 5-10 10" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
-      <path d="M19 29c2.5 2 7.5 2 10 0" fill="none" stroke={filled ? 'var(--ivory)' : 'currentColor'} strokeWidth="2.2" strokeLinecap="round" />
+    <svg viewBox="0 0 56 48" aria-hidden="true" className={`reaction-art human-reaction ${filled ? 'is-filled' : ''}`}>
+      <circle cx="20" cy="11" r="7" fill="#d89d76" />
+      <circle cx="36" cy="11" r="7" fill="#b97957" />
+      <path d="M10 44V30c0-8 4-13 11-13 3 0 5 1 7 3 2-2 4-3 7-3 7 0 11 5 11 13v14H10Z" fill="currentColor" />
+      <path d="M8 25c7 1 10 6 14 12M48 25c-7 1-10 6-14 12" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
+      <path d="M19 26c5 5 13 5 18 0" fill="none" stroke={filled ? '#fff' : 'var(--paper)'} strokeWidth="3" strokeLinecap="round" opacity=".9" />
+      <circle cx="18" cy="10" r=".8" fill="#2b2423" /><circle cx="22" cy="10" r=".8" fill="#2b2423" />
+      <circle cx="34" cy="10" r=".8" fill="#2b2423" /><circle cx="38" cy="10" r=".8" fill="#2b2423" />
+      {filled && <path d="M28 18c-4-4-9 2 0 8 9-6 4-12 0-8Z" fill="#fff" />}
     </svg>
   );
 }
 
 export function ThrowIcon({ filled = false }) {
   return (
-    <svg viewBox="0 0 54 48" aria-hidden="true" className="reaction-art throw-art">
-      <circle cx="14" cy="12" r="5.5" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.5" />
-      <path d="M8 39v-9c0-7 2-11 7-11 4 0 6 3 7 8l1 7" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
-      <path d="M18 24l10-4" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" />
-      <circle cx="39" cy="13" r="5" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.5" />
-      <path d="M33 22l9 4 5 10M42 26l-8 10M32 18l-5-2" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
-      <path d="M26 10l4-3M28 14h5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <svg viewBox="0 0 62 48" aria-hidden="true" className={`reaction-art throw-art human-reaction ${filled ? 'is-filled' : ''}`}>
+      <circle cx="16" cy="10" r="6.5" fill="#d89d76" />
+      <path d="M7 44V29c0-8 3-13 10-13s9 6 10 13l2 15H7Z" fill="currentColor" />
+      <path d="m22 22 16-7" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
+      <circle cx="46" cy="11" r="5.7" fill="#b97957" />
+      <path d="m40 18 11 5 7 12-5 3-8-10-8 13-5-3 9-15-4-3 3-2Z" fill="currentColor" />
+      <path d="m35 8 5-4m-4 9 6-1" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <circle cx="14" cy="9" r=".8" fill="#2b2423" /><circle cx="18" cy="9" r=".8" fill="#2b2423" />
+      <circle cx="44.5" cy="10" r=".7" fill="#2b2423" /><circle cx="47.5" cy="10" r=".7" fill="#2b2423" />
     </svg>
   );
 }
@@ -51,4 +56,3 @@ export function PersonSilhouette({ gender = 'neutral' }) {
     </svg>
   );
 }
-

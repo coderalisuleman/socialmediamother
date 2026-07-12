@@ -7,6 +7,7 @@ import { Post } from '../models/Post.js';
 import { Follow } from '../models/Follow.js';
 import { Reaction } from '../models/Reaction.js';
 import { OtpChallenge } from '../models/OtpChallenge.js';
+import { Comment } from '../models/Comment.js';
 import { AppError } from '../utils/errors.js';
 import { escapeRegex } from '../utils/normalize.js';
 
@@ -15,6 +16,7 @@ const memory = {
   posts: new Map(),
   follows: new Map(),
   reactions: new Map(),
+  comments: new Map(),
   otps: new Map()
 };
 
@@ -24,6 +26,17 @@ const clone = (value) => value == null ? value : structuredClone(value);
 const followKey = (follower, followed) => `${follower}:${followed}`;
 const reactionKey = (user, post) => `${user}:${post}`;
 const comparableId = (value) => String(value?._id || value?.id || value);
+
+const asPlainComment = (document) => {
+  if (!document) return null;
+  const value = typeof document.toObject === 'function' ? document.toObject() : clone(document);
+  value.id = comparableId(value);
+  value.post = comparableId(value.post);
+  delete value._id;
+  delete value.__v;
+  if (value.author) value.author = asPlainUser(value.author);
+  return value;
+};
 
 const asPlainUser = (document) => {
   if (!document) return null;
@@ -501,6 +514,76 @@ export const setReaction = async (userId, postId, nextKind) => {
     user.typePreferences[rawPost.type] += delta;
   }
   return { post: hydrateMemoryPost(rawPost), reaction: nextKind };
+};
+
+export const listComments = async (postId, { limit = 100 } = {}) => {
+  const post = await getPostById(postId);
+  if (!post) throw new AppError(404, 'Post not found', 'POST_NOT_FOUND');
+  if (config.storageMode === 'mongodb') {
+    if (!mongoose.isValidObjectId(postId)) return [];
+    const rows = await Comment.find({ post: postId }).sort({ createdAt: 1 }).limit(limit)
+      .populate('author', 'fullName username gender bio profileImageFileId followerCount followingCount').lean();
+    return rows.map(asPlainComment);
+  }
+  return [...memory.comments.values()]
+    .filter((comment) => comment.post === String(postId))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .slice(0, limit)
+    .map((comment) => {
+      const value = clone(comment);
+      value.author = clone(memory.users.get(value.author));
+      if (value.author) delete value.author.passwordHash;
+      return value;
+    });
+};
+
+export const createComment = async (postId, authorId, body) => {
+  const post = await getPostById(postId);
+  if (!post) throw new AppError(404, 'Post not found', 'POST_NOT_FOUND');
+  if (config.storageMode === 'mongodb') {
+    const created = await Comment.create({ post: postId, author: authorId, body });
+    const populated = await Comment.findById(created._id)
+      .populate('author', 'fullName username gender bio profileImageFileId followerCount followingCount').lean();
+    return asPlainComment(populated);
+  }
+  const date = nowIso();
+  const comment = { id: makeId(), post: String(postId), author: String(authorId), body, createdAt: date, updatedAt: date };
+  memory.comments.set(comment.id, comment);
+  const value = clone(comment);
+  value.author = clone(memory.users.get(String(authorId)));
+  if (value.author) delete value.author.passwordHash;
+  return value;
+};
+
+export const updateComment = async (commentId, authorId, body) => {
+  if (config.storageMode === 'mongodb') {
+    if (!mongoose.isValidObjectId(commentId)) return null;
+    const row = await Comment.findOneAndUpdate(
+      { _id: commentId, author: authorId },
+      { $set: { body } },
+      { new: true, runValidators: true }
+    ).populate('author', 'fullName username gender bio profileImageFileId followerCount followingCount').lean();
+    return asPlainComment(row);
+  }
+  const comment = memory.comments.get(String(commentId));
+  if (!comment || comment.author !== String(authorId)) return null;
+  comment.body = body;
+  comment.updatedAt = nowIso();
+  const value = clone(comment);
+  value.author = clone(memory.users.get(String(authorId)));
+  if (value.author) delete value.author.passwordHash;
+  return value;
+};
+
+export const deleteComment = async (commentId, authorId) => {
+  if (config.storageMode === 'mongodb') {
+    if (!mongoose.isValidObjectId(commentId)) return false;
+    return Boolean(await Comment.findOneAndDelete({ _id: commentId, author: authorId }));
+  }
+  const comment = memory.comments.get(String(commentId));
+  if (!comment || comment.author !== String(authorId)) return false;
+  memory.comments.delete(String(commentId));
+  return true;
 };
 
 export const recordView = async (userId, postId) => {

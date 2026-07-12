@@ -5,7 +5,7 @@ import { decodeCursor, encodeCursor, pageLimit } from '../utils/cursor.js';
 import { cleanUsername } from '../utils/normalize.js';
 import {
   findUserByIdentifier, findUserById, isFollowing, listPostsByAuthor,
-  listRelationshipUsers, setFollowing, updateUser
+  listRelationshipUsers, reactionForPosts, setFollowing, updateUser
 } from '../services/store.js';
 import { privateUser, publicPost, publicUser } from '../services/serializers.js';
 import { optionalAuth, requireAuth } from '../middleware/auth.js';
@@ -87,10 +87,13 @@ usersRouter.get('/:username/posts', optionalAuth, asyncHandler(async (req, res) 
   const hasMore = rows.length > limit;
   const posts = rows.slice(0, limit);
   const tail = posts.at(-1);
-  const viewerFollows = await isFollowing(req.user?.id, user.id);
+  const [viewerFollows, reactions] = await Promise.all([
+    isFollowing(req.user?.id, user.id),
+    reactionForPosts(req.user?.id, posts.map((post) => post.id))
+  ]);
   res.json({
     user: publicUser(user, { viewerFollows }),
-    posts: posts.map((post) => publicPost(post, { viewerFollowsAuthor: viewerFollows })),
+    posts: posts.map((post) => publicPost(post, { viewerFollowsAuthor: viewerFollows, viewerReaction: reactions[post.id] || null })),
     nextCursor: hasMore && tail ? encodeCursor({ createdAt: tail.createdAt, id: tail.id }) : null
   });
 }));

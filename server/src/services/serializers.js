@@ -51,3 +51,12 @@ export const publicPost = (post, { viewerReaction = null, viewerFollowsAuthor = 
   createdAt: post.createdAt,
   updatedAt: post.updatedAt
 });
+
+export const publicComment = (comment) => ({
+  id: String(comment.id || comment._id),
+  postId: String(comment.post?.id || comment.post?._id || comment.post),
+  body: comment.body || '',
+  author: publicUser(comment.author),
+  createdAt: comment.createdAt,
+  updatedAt: comment.updatedAt
+});

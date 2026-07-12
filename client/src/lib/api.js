@@ -73,6 +73,10 @@ export const api = {
   createPost: (formData) => request('/posts', { method: 'POST', body: formData, timeout: 10 * 60_000 }),
   reactToPost: (postId, reaction) =>
     request(`/posts/${postId}/reaction`, { method: 'PUT', body: JSON.stringify({ reaction }) }),
+  listComments: (postId) => request(`/posts/${encodeURIComponent(postId)}/comments`),
+  createComment: (postId, body) => request(`/posts/${encodeURIComponent(postId)}/comments`, { method: 'POST', body: JSON.stringify({ body }) }),
+  updateComment: (postId, commentId, body) => request(`/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
+  deleteComment: (postId, commentId) => request(`/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE' }),
   recordPostView: (postId) => request(`/posts/${postId}/view`, { method: 'POST' }),
   requestOtp: (channel, destination) =>
     request('/auth/otp/request', { method: 'POST', body: JSON.stringify({ channel, destination }) }),
@@ -95,6 +99,10 @@ export const api = {
   listRelationshipPeople: (username, direction, cursor) => request(
     `/users/${encodeURIComponent(username)}/${direction === 'followers' ? 'people-who-want-to-be-with-me' : 'people-i-want-to-be-with'}${queryString({ cursor, limit: 30 })}`,
   ),
+  listUserPosts: async (username, type) => {
+    const payload = await request(`/users/${encodeURIComponent(username)}/posts${queryString({ type, limit: 50 })}`);
+    return { ...payload, posts: (payload?.posts || []).map(normalizePostShape) };
+  },
 };
 
 function exactNumericCount(value) {

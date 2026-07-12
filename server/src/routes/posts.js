@@ -4,9 +4,10 @@ import { asyncHandler, AppError, assert } from '../utils/errors.js';
 import { cleanLinks } from '../utils/normalize.js';
 import { inChunks } from '../utils/cursor.js';
 import {
-  createPost, getPostById, isFollowing, reactionForPosts, recordView, setReaction, softDeletePost
+  createComment, createPost, deleteComment, getPostById, isFollowing, listComments,
+  reactionForPosts, recordView, setReaction, softDeletePost, updateComment
 } from '../services/store.js';
-import { publicPost } from '../services/serializers.js';
+import { publicComment, publicPost } from '../services/serializers.js';
 import { optionalAuth, requireAuth } from '../middleware/auth.js';
 import { upload } from '../middleware/upload.js';
 import { removeFiles, saveUploadedFile } from '../services/files.js';
@@ -96,11 +97,35 @@ postsRouter.delete('/:postId', requireAuth, asyncHandler(async (req, res) => {
 postsRouter.put('/:postId/reaction', requireAuth, asyncHandler(async (req, res) => {
   const requested = req.body?.reaction ?? req.body?.kind ?? null;
   assert(requested === null || ['hug', 'throw'].includes(requested), 422, 'reaction must be hug, throw, or null', 'INVALID_REACTION');
-  const current = (await reactionForPosts(req.user.id, [req.params.postId]))[req.params.postId] || null;
-  const next = current === requested ? null : requested;
-  const result = await setReaction(req.user.id, req.params.postId, next);
+  const result = await setReaction(req.user.id, req.params.postId, requested);
   const viewerFollowsAuthor = await isFollowing(req.user.id, result.post.author?.id);
   res.json({ post: publicPost(result.post, { viewerReaction: result.reaction, viewerFollowsAuthor }), reaction: result.reaction });
+}));
+
+postsRouter.get('/:postId/comments', optionalAuth, asyncHandler(async (req, res) => {
+  const comments = await listComments(req.params.postId, { limit: 100 });
+  res.json({ comments: comments.map(publicComment) });
+}));
+
+postsRouter.post('/:postId/comments', requireAuth, asyncHandler(async (req, res) => {
+  const body = String(req.body?.body || '').trim();
+  assert(body.length >= 1 && body.length <= 2_000, 422, 'A comment must be 1–2,000 characters', 'INVALID_COMMENT');
+  const comment = await createComment(req.params.postId, req.user.id, body);
+  res.status(201).json({ comment: publicComment(comment) });
+}));
+
+postsRouter.patch('/:postId/comments/:commentId', requireAuth, asyncHandler(async (req, res) => {
+  const body = String(req.body?.body || '').trim();
+  assert(body.length >= 1 && body.length <= 2_000, 422, 'A comment must be 1–2,000 characters', 'INVALID_COMMENT');
+  const comment = await updateComment(req.params.commentId, req.user.id, body);
+  if (!comment) throw new AppError(404, 'Comment not found or you do not own it', 'COMMENT_NOT_FOUND');
+  res.json({ comment: publicComment(comment) });
+}));
+
+postsRouter.delete('/:postId/comments/:commentId', requireAuth, asyncHandler(async (req, res) => {
+  const removed = await deleteComment(req.params.commentId, req.user.id);
+  if (!removed) throw new AppError(404, 'Comment not found or you do not own it', 'COMMENT_NOT_FOUND');
+  res.status(204).end();
 }));
 
 postsRouter.post('/:postId/view', optionalAuth, asyncHandler(async (req, res) => {

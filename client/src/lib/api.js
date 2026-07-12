@@ -1,3 +1,5 @@
+import { calculateUploadProgress } from './uploadProgress';
+
 const API_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 const TOKEN_KEY = 'mother.session';
 
@@ -17,6 +19,13 @@ export function getToken() {
 export function setToken(token) {
   if (token) localStorage.setItem(TOKEN_KEY, token);
   else localStorage.removeItem(TOKEN_KEY);
+}
+
+function apiErrorFromPayload(payload, status) {
+  const baseMessage = payload?.error?.message || payload?.message || (typeof payload?.error === 'string' ? payload.error : '') || `Request failed (${status})`;
+  const validationDetails = Array.isArray(payload?.error?.details) ? payload.error.details.filter(Boolean) : [];
+  const message = validationDetails.length ? `${baseMessage}: ${validationDetails.join('; ')}` : baseMessage;
+  return new ApiError(message, status, payload);
 }
 
 async function request(path, options = {}) {
@@ -43,10 +52,7 @@ async function request(path, options = {}) {
       : await response.text();
 
     if (!response.ok) {
-      const baseMessage = payload?.error?.message || payload?.message || (typeof payload?.error === 'string' ? payload.error : '') || `Request failed (${response.status})`;
-      const validationDetails = Array.isArray(payload?.error?.details) ? payload.error.details.filter(Boolean) : [];
-      const message = validationDetails.length ? `${baseMessage}: ${validationDetails.join('; ')}` : baseMessage;
-      throw new ApiError(message, response.status, payload);
+      throw apiErrorFromPayload(payload, response.status);
     }
     return payload;
   } catch (error) {
@@ -56,6 +62,40 @@ async function request(path, options = {}) {
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+function uploadRequest(path, { body, timeout = 10 * 60_000, onUploadProgress } = {}) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const token = getToken();
+    const startedAt = performance.now();
+    xhr.open('POST', `${API_BASE}${path}`);
+    xhr.timeout = timeout;
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+    xhr.upload.addEventListener('progress', (event) => {
+      if (!event.lengthComputable) return;
+      onUploadProgress?.(calculateUploadProgress(event.loaded, event.total, performance.now() - startedAt));
+    });
+
+    xhr.addEventListener('load', () => {
+      const contentType = xhr.getResponseHeader('content-type') || '';
+      let payload = xhr.responseText;
+      if (contentType.includes('application/json')) {
+        try {
+          payload = JSON.parse(xhr.responseText || '{}');
+        } catch {
+          payload = {};
+        }
+      }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(payload);
+      else reject(apiErrorFromPayload(payload, xhr.status));
+    });
+    xhr.addEventListener('error', () => reject(new ApiError('Mother could not reach the server. Your connection may be offline.')));
+    xhr.addEventListener('timeout', () => reject(new ApiError('The upload took too long. Please try again.')));
+    xhr.addEventListener('abort', () => reject(new ApiError('The upload was cancelled.')));
+    xhr.send(body);
+  });
 }
 
 function queryString(params = {}) {
@@ -72,7 +112,7 @@ export const api = {
   getPost: async (postId) => normalizePostShape((await request(`/posts/${encodeURIComponent(postId)}`))?.post),
   getUser: async (username) => normalizeUserShape((await request(`/users/${encodeURIComponent(String(username).replace(/^@/, ''))}`))?.user),
   search: async (params) => normalizeSearchResponse(await request(`/search${queryString(params)}`)),
-  createPost: (formData) => request('/posts', { method: 'POST', body: formData, timeout: 10 * 60_000 }),
+  createPost: (formData, { onUploadProgress } = {}) => uploadRequest('/posts', { body: formData, onUploadProgress }),
   reactToPost: (postId, reaction) =>
     request(`/posts/${postId}/reaction`, { method: 'PUT', body: JSON.stringify({ reaction }) }),
   listComments: (postId) => request(`/posts/${encodeURIComponent(postId)}/comments`),

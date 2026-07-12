@@ -1877,6 +1877,112 @@ h3 {
   font-weight: 680;
 }
 
+.upload-progress-card {
+  padding: 15px;
+  margin-top: 18px;
+  border: 1px solid rgba(59, 145, 182, .24);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(236, 247, 251, .98), rgba(255, 250, 244, .98));
+  box-shadow: 0 10px 26px rgba(49, 91, 107, .08);
+}
+
+.upload-progress-head,
+.upload-progress-head > span {
+  display: flex;
+  align-items: center;
+}
+
+.upload-progress-head {
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--teal-dark);
+}
+
+.upload-progress-head > span { gap: 8px; }
+.upload-progress-head strong { font-size: .76rem; }
+.upload-progress-head b { color: var(--clay-dark); font-size: 1rem; }
+
+.upload-progress-track {
+  height: 12px;
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(59, 145, 182, .16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .82);
+}
+
+.upload-progress-track > span {
+  position: relative;
+  display: block;
+  min-width: 3px;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--ocean), var(--teal), var(--clay));
+  transition: width 180ms ease;
+}
+
+.upload-progress-track > span::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 20%, rgba(255, 255, 255, .7) 48%, transparent 76%);
+  content: '';
+  transform: translateX(-100%);
+  animation: uploadProgressShine 1.15s linear infinite;
+}
+
+@keyframes uploadProgressShine {
+  to { transform: translateX(100%); }
+}
+
+.upload-progress-details {
+  display: grid;
+  grid-template-columns: 1.2fr .75fr .75fr 1.3fr;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.upload-progress-details > span {
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .62);
+}
+
+.upload-progress-details small,
+.upload-progress-details strong {
+  display: block;
+}
+
+.upload-progress-details small {
+  margin-bottom: 3px;
+  color: var(--ink-soft);
+  font-size: .55rem;
+  font-weight: 750;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.upload-progress-details strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: .67rem;
+  line-height: 1.35;
+}
+
+.upload-progress-card.failed {
+  border-color: rgba(183, 43, 53, .28);
+  background: #fff4f4;
+}
+
+.upload-progress-card.failed .upload-progress-track > span {
+  background: var(--danger);
+}
+
+@media (max-width: 700px) {
+  .upload-progress-details { grid-template-columns: 1fr 1fr; }
+}
+
 .form-actions {
   display: flex;
   align-items: center;

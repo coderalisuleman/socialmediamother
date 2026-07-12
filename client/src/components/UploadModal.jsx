@@ -2,6 +2,7 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { AlignLeft, ArrowDownToLine, ArrowLeft, CheckCircle2, Film, Image as ImageIcon, Link2, LoaderCircle, Plus, Smartphone, UploadCloud, Video } from 'lucide-react';
 import { useObjectUrls } from '../lib/hooks';
 import { optimizePhoto } from '../lib/media';
+import { formatBytes, formatRemainingTime } from '../lib/uploadProgress';
 import Modal from './Modal';
 import { MediaCarousel } from './Feed';
 
@@ -11,6 +12,45 @@ const choices = [
   { id: 'video', label: 'Video', detail: 'One film or a carousel', icon: Video },
   { id: 'short-video', label: 'Short video', detail: 'Vertical, quick and in motion', icon: Smartphone },
 ];
+
+function UploadProgress({ progress }) {
+  if (!progress) return null;
+  const failed = progress.status === 'failed';
+  const processing = progress.status === 'processing';
+  const remainingBytes = Math.max(0, progress.total - progress.loaded);
+  const timeLabel = failed
+    ? 'Upload stopped — retry when ready'
+    : processing
+      ? 'Upload sent — finishing your post'
+      : progress.remainingSeconds == null
+        ? 'Calculating time left…'
+        : `${formatRemainingTime(progress.remainingSeconds)} left`;
+
+  return (
+    <section className={`upload-progress-card ${failed ? 'failed' : ''}`} aria-live="polite">
+      <div className="upload-progress-head">
+        <span><UploadCloud size={19} /><strong>{failed ? 'Upload stopped' : processing ? 'Finishing your post' : 'Uploading your post'}</strong></span>
+        <b>{progress.percent}%</b>
+      </div>
+      <div
+        className="upload-progress-track"
+        role="progressbar"
+        aria-label="Post upload progress"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow={progress.percent}
+      >
+        <span style={{ width: `${progress.percent}%` }} />
+      </div>
+      <div className="upload-progress-details">
+        <span><small>Transferred</small><strong>{formatBytes(progress.loaded)} of {formatBytes(progress.total)}</strong></span>
+        <span><small>Remaining</small><strong>{formatBytes(remainingBytes)}</strong></span>
+        <span><small>Speed</small><strong>{progress.bytesPerSecond > 0 ? `${formatBytes(progress.bytesPerSecond)}/s` : 'Measuring…'}</strong></span>
+        <span><small>Time remaining</small><strong>{timeLabel}</strong></span>
+      </div>
+    </section>
+  );
+}
 
 const DropField = memo(function DropField({ mode, files, setFiles }) {
   const inputRef = useRef(null);
@@ -104,6 +144,7 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
   const [text, setText] = useState('');
   const [files, setFiles] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null);
   const [error, setError] = useState('');
   const textareaRef = useRef(null);
 
@@ -114,6 +155,7 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
   const chooseMode = (nextMode) => {
     setMode(nextMode);
     setFiles([]);
+    setUploadProgress(null);
     setError('');
     onModeChange?.(nextMode);
   };
@@ -125,6 +167,7 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
     setLink('');
     setText('');
     setFiles([]);
+    setUploadProgress(null);
     setError('');
   };
 
@@ -152,6 +195,15 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
     if (mode === 'text' && !text.trim()) return setError('Write at least one line before posting.');
     if (mode !== 'text' && !name.trim()) return setError('Please give this post a name.');
     if (mode !== 'text' && !files.length) return setError(`Choose at least one ${mode === 'photo' ? 'photo' : 'video'}.`);
+    const totalFileBytes = files.reduce((total, file) => total + Number(file.size || 0), 0);
+    setUploadProgress(mode === 'text' ? null : {
+      loaded: 0,
+      total: totalFileBytes,
+      percent: 0,
+      bytesPerSecond: 0,
+      remainingSeconds: null,
+      status: 'uploading',
+    });
     setSubmitting(true);
     try {
       const cleanText = text.trim();
@@ -162,10 +214,11 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
         links: mode === 'text' ? [] : link.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean),
         text: cleanText,
         files,
-      });
+      }, setUploadProgress);
       reset();
       onClose();
     } catch (submitError) {
+      setUploadProgress((current) => current ? { ...current, status: 'failed' } : null);
       setError(submitError.message || 'This post could not be shared. Please try again.');
     } finally {
       setSubmitting(false);
@@ -223,11 +276,12 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
               </label>
             </div>
           )}
+          <UploadProgress progress={uploadProgress} />
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="form-actions">
             <button type="button" className="secondary-button" onClick={close} disabled={submitting}>Cancel</button>
             <button type="submit" className="primary-button" disabled={submitting}>
-              {submitting ? <><LoaderCircle className="spin" size={17} /> Posting…</> : <><Film size={17} /> Post it</>}
+              {submitting ? <><LoaderCircle className="spin" size={17} /> {uploadProgress ? uploadProgress.status === 'processing' ? 'Finishing…' : `Uploading ${uploadProgress.percent}%` : 'Posting…'}</> : <><Film size={17} /> Post it</>}
             </button>
           </div>
         </form>

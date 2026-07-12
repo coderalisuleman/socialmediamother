@@ -278,7 +278,7 @@ export default function App() {
     }
   };
 
-  const createPost = async (values) => {
+  const createPost = async (values, onUploadProgress) => {
     const form = new FormData();
     form.append('type', values.type);
     form.append('nameIt', values.type === 'text' ? '' : values.name || '');
@@ -288,7 +288,7 @@ export default function App() {
     values.files.forEach((file) => form.append('files', file));
 
     try {
-      const payload = await api.createPost(form);
+      const payload = await api.createPost(form, { onUploadProgress });
       const post = normalizePostShape(payload?.post || payload?.data?.post || payload?.data || payload);
       setPosts((current) => [post, ...current]);
       return;

@@ -24,6 +24,7 @@ export const RESERVED_TOP_LEVEL_PATHS = new Set([
   'feed',
   'health',
   'home',
+  'humanbehaviour',
   'icon-192.png',
   'icon-512.png',
   'login',
@@ -91,7 +92,7 @@ export function feedPath(mode, username) {
 
 export function searchPath(query) {
   const clean = String(query || '').trim();
-  return clean ? `/search?search=${encodeURIComponent(clean)}` : '/';
+  return clean ? '/search' : '/';
 }
 
 export function postPath(postId) {
@@ -106,7 +107,8 @@ export function parseAppLocation(location = window.location) {
   if (!segments.length) return { kind: query ? 'search' : 'home', query };
   if (segments.length === 1 && segments[0] === 'createaccount') return { kind: 'create-account' };
   if (segments.length === 1 && segments[0] === 'accountin') return { kind: 'account-in' };
-  if (segments[0] === 'search') return { kind: query ? 'search' : 'home', query };
+  if (segments.length === 1 && segments[0] === 'humanbehaviour') return { kind: 'human-behaviour' };
+  if (segments[0] === 'search') return { kind: 'search', query: query || null };
 
   if (segments[0] === 'feed' && segments.length === 2 && ['everyone', 'following'].includes(segments[1])) {
     return { kind: 'feed', feedMode: segments[1] };

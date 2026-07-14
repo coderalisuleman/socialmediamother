@@ -10,7 +10,7 @@ import {
 import { cleanUsername } from './normalize.js';
 
 test('keeps special pages out of the public username namespace', () => {
-  for (const username of ['createaccount', 'accountin', 'post', 'api', 'health', 'search']) {
+  for (const username of ['createaccount', 'accountin', 'humanbehaviour', 'post', 'api', 'health', 'search']) {
     assert.equal(isReservedUsername(username), true);
     assert.equal(isPublicUsername(username), false);
     assert.equal(profilePath(username), null);
@@ -32,6 +32,9 @@ test('classifies every supported friendly page route', () => {
   });
   assert.deepEqual(classifyPagePath('/accountin'), {
     kind: 'private', page: 'accountin', path: '/accountin', username: null, format: null
+  });
+  assert.deepEqual(classifyPagePath('/humanbehaviour'), {
+    kind: 'private', page: 'humanbehaviour', path: '/humanbehaviour', username: null, format: null
   });
   assert.deepEqual(classifyPagePath('/jasmine/setting'), {
     kind: 'private', page: 'setting', path: '/jasmine/setting', username: 'jasmine', format: null

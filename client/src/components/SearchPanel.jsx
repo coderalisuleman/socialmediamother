@@ -41,6 +41,9 @@ function scorePost(post, query) {
     post.link,
     ...(post.media || []).map((item) => item.name || item.alt),
   ].filter(Boolean).join(' '));
+  const contentQuery = q.replace(/\bby\s+@?[a-z]{1,40}(?=\s|$)/g, '').replace(/@[a-z]{1,40}/g, '').trim();
+  const contentTokens = contentQuery.split(/[^a-z0-9]+/).filter(Boolean);
+  if (contentTokens.length && !contentTokens.every((token) => haystack.includes(token))) return 0;
   let score = 0;
   if (q.includes(`by @${username}`)) score += 1200;
   else if (q.includes(`@${username}`)) score += 900;
@@ -62,7 +65,7 @@ function localResults(query, people, posts) {
   return { people: rankedPeople, posts: rankedPosts };
 }
 
-export default function SearchPanel({ query, people, posts, onFollow, onPerson, onPost, viewer, onRequireAuth }) {
+export default function SearchPanel({ query, people, posts, onFollow, onPerson, onPost, onDeletePost, viewer, onRequireAuth }) {
   const debounced = useDebouncedValue(query, 260);
   const [filter, setFilter] = useState('all');
   const [remote, setRemote] = useState(null);
@@ -133,8 +136,7 @@ export default function SearchPanel({ query, people, posts, onFollow, onPerson, 
       <header className="search-heading">
         <div>
           <p className="eyebrow"><Sparkles size={14} /> Smart search</p>
-          <h1>Results for “{query.trim()}”</h1>
-          <p>Names, unique @usernames and the words inside every post are ranked together.</p>
+          <h1>Search</h1>
         </div>
         {usedLocal && <span className="preview-chip">Showing what is already here</span>}
       </header>
@@ -146,6 +148,7 @@ export default function SearchPanel({ query, people, posts, onFollow, onPerson, 
           </button>
         ))}
       </div>
+      <div className="search-watching" aria-live="polite"><Search size={17} /><span>Watching <strong>{contentTypeLabels[filter]}</strong> for “{query.trim()}”</span><b>{results.posts.length} found</b></div>
 
       {loading && !remote ? <FeedSkeleton /> : (
         <>
@@ -172,10 +175,10 @@ export default function SearchPanel({ query, people, posts, onFollow, onPerson, 
           )}
 
           <section className="post-results" aria-labelledby="posts-title">
-            <div className="section-title"><h2 id="posts-title">Posts that match</h2><span>{results.posts.length}</span></div>
+            <div className="section-title"><h2 id="posts-title">What you are watching</h2><span>{results.posts.length}</span></div>
             {results.posts.length > 0 ? (
               <div className="feed-column search-feed">
-                {results.posts.map((post, index) => <FeedCard post={post} key={post.id} onFollow={followFromSearch} onPerson={onPerson} onPost={onPost} viewer={viewer} onRequireAuth={onRequireAuth} priority={index === 0} />)}
+                {results.posts.map((post, index) => <FeedCard post={post} key={post.id} onFollow={followFromSearch} onPerson={onPerson} onPost={onPost} onDelete={onDeletePost} viewer={viewer} onRequireAuth={onRequireAuth} priority={index === 0} />)}
                 {remote?.nextCursor && <LoadMore loading={loadingMore} done={false} onClick={loadMoreResults} />}
               </div>
             ) : (

@@ -20,6 +20,7 @@ const postSchema = new mongoose.Schema({
   hugCount: { type: Number, min: 0, default: 0 },
   throwCount: { type: Number, min: 0, default: 0 },
   viewCount: { type: Number, min: 0, default: 0 },
+  commentCount: { type: Number, min: 0, default: 0 },
   deletedAt: { type: Date, default: null, index: true }
 }, { timestamps: true });
 
@@ -30,4 +31,3 @@ postSchema.index({ nameIt: 'text', detail: 'text', text: 'text', links: 'text' }
 });
 
 export const Post = mongoose.model('Post', postSchema);
-

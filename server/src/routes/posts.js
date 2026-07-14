@@ -1,81 +1,21 @@
 import express from 'express';
-import { promises as fsPromises } from 'node:fs';
 import { asyncHandler, AppError, assert } from '../utils/errors.js';
-import { cleanLinks } from '../utils/normalize.js';
-import { inChunks } from '../utils/cursor.js';
 import {
-  createComment, createPost, deleteComment, getPostById, isFollowing, listComments,
+  createComment, deleteComment, getPostById, isFollowing, listComments,
   reactionForPosts, recordView, setReaction, softDeletePost, updateComment
 } from '../services/store.js';
 import { publicComment, publicPost } from '../services/serializers.js';
 import { optionalAuth, requireAuth } from '../middleware/auth.js';
 import { upload } from '../middleware/upload.js';
-import { removeFiles, saveUploadedFile } from '../services/files.js';
 import { config } from '../config.js';
-import { hasValidMediaSignature } from '../utils/media.js';
+import { publishPostFiles } from '../services/postPublisher.js';
 
 export const postsRouter = express.Router();
 
-const validTypes = ['text', 'photo', 'video', 'short-video'];
-const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif']);
-const allowedVideoTypes = new Set(['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-matroska']);
-
-const cleanupTemp = async (files = []) => {
-  await Promise.allSettled(files.map((file) => fsPromises.rm(file.path, { force: true })));
-};
-
 postsRouter.post('/', requireAuth, upload.array('files', config.maxFilesPerPost), asyncHandler(async (req, res) => {
   const files = req.files || [];
-  const type = req.body?.type;
-  try {
-    const aggregateBytes = files.reduce((total, file) => total + Number(file.size || 0), 0);
-    assert(aggregateBytes <= config.maxUploadBytes, 413,
-      `A post can contain at most ${Math.floor(config.maxUploadBytes / 1024 / 1024)} MB in total`, 'UPLOAD_TOO_LARGE');
-    assert(validTypes.includes(type), 422, 'type must be text, photo, video, or short-video', 'INVALID_POST_TYPE');
-    const text = String(req.body?.text || '').trim();
-    const nameIt = String(req.body?.nameIt || '').trim();
-    const detail = String(req.body?.detail || '').trim();
-    assert(text.length <= 20_000, 422, 'Text must be at most 20,000 characters', 'TEXT_TOO_LONG');
-    assert(nameIt.length <= 200, 422, 'nameIt must be at most 200 characters', 'NAME_TOO_LONG');
-    assert(detail.length <= 5_000, 422, 'Detail must be at most 5,000 characters', 'DETAIL_TOO_LONG');
-    if (type === 'text') {
-      assert(text.length > 0, 422, 'Write some text before posting', 'TEXT_REQUIRED');
-      assert(files.length === 0, 422, 'Text posts cannot contain media files', 'UNEXPECTED_MEDIA');
-    } else {
-      assert(nameIt.length > 0, 422, 'nameIt is required for photo and video posts', 'NAME_REQUIRED');
-      assert(files.length > 0, 422, 'Choose at least one file', 'MEDIA_REQUIRED');
-      const allowedTypes = type === 'photo' ? allowedImageTypes : allowedVideoTypes;
-      assert(files.every((file) => allowedTypes.has(file.mimetype)), 415,
-        `${type === 'photo' ? 'Photo' : 'Video'} posts contain an unsupported file type`, 'INVALID_MEDIA_TYPE');
-      const signatures = await Promise.all(files.map(hasValidMediaSignature));
-      assert(signatures.every(Boolean), 415, 'A file does not match its declared media type', 'INVALID_MEDIA_SIGNATURE');
-    }
-
-    let altTexts = [];
-    if (req.body?.altTexts) {
-      try { altTexts = JSON.parse(req.body.altTexts); } catch { throw new AppError(422, 'altTexts must be a JSON array', 'INVALID_ALT_TEXT'); }
-      assert(Array.isArray(altTexts), 422, 'altTexts must be an array', 'INVALID_ALT_TEXT');
-    }
-
-    const saved = [];
-    try {
-      for await (const chunk of inChunks(files, 2)) {
-        const batch = await Promise.all(chunk.map((file) => saveUploadedFile(file, { ownerId: req.user.id, purpose: 'post' })));
-        saved.push(...batch);
-      }
-      const media = saved.map((file, order) => ({ ...file, order, alt: String(altTexts[order] || '').slice(0, 300) }));
-      const post = await createPost({
-        author: req.user.id, type, text, nameIt, detail,
-        links: cleanLinks(req.body?.links), media
-      });
-      res.status(201).json({ post: publicPost(post) });
-    } catch (error) {
-      await removeFiles(saved.map((file) => file.fileId));
-      throw error;
-    }
-  } finally {
-    await cleanupTemp(files);
-  }
+  const post = await publishPostFiles({ files, body: req.body || {}, userId: req.user.id });
+  res.status(201).json({ post: publicPost(post) });
 }));
 
 postsRouter.get('/:postId', optionalAuth, asyncHandler(async (req, res) => {

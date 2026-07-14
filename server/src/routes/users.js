@@ -38,6 +38,33 @@ usersRouter.patch('/me', requireAuth, asyncHandler(async (req, res) => {
     assert(['female', 'male', 'other', 'prefer-not-to-say'].includes(req.body.gender), 422, 'Choose a valid gender', 'INVALID_GENDER');
     changes.gender = req.body.gender;
   }
+  if ('username' in req.body) {
+    const username = cleanUsername(req.body.username);
+    const existing = await findUserByIdentifier(username);
+    assert(!existing || String(existing.id) === String(req.user.id), 409, 'That username is already in use', 'USERNAME_TAKEN');
+    changes.username = username;
+  }
+  if ('email' in req.body) {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    assert(!email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), 422, 'Enter a valid email address', 'INVALID_EMAIL');
+    if (email) {
+      const existing = await findUserByIdentifier(email);
+      assert(!existing || String(existing.id) === String(req.user.id), 409, 'That email is already in use', 'EMAIL_TAKEN');
+    }
+    changes.email = email || null;
+    changes.verifiedEmail = email === req.user.email && Boolean(req.user.verifiedEmail);
+  }
+  if ('phone' in req.body) {
+    const phone = String(req.body.phone || '').replace(/[\s()-]/g, '');
+    assert(!phone || /^\+[1-9]\d{6,14}$/.test(phone), 422, 'Use a valid phone number with its country code, for example +923254695657', 'INVALID_PHONE');
+    if (phone) {
+      const existing = await findUserByIdentifier(phone);
+      assert(!existing || String(existing.id) === String(req.user.id), 409, 'That phone number is already in use', 'PHONE_TAKEN');
+    }
+    changes.phone = phone || null;
+    changes.verifiedPhone = phone === req.user.phone && Boolean(req.user.verifiedPhone);
+  }
+  assert(Object.keys(changes).length > 0, 422, 'Choose at least one account detail to change', 'NO_PROFILE_CHANGES');
   const user = await updateUser(req.user.id, changes);
   res.json({ user: privateUser(user) });
 }));

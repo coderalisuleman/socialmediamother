@@ -22,13 +22,14 @@ test('builds every public and private friendly path', () => {
   assert.equal(uploadPath('jasmine', 'short-video'), '/jasmine/upload/short-video-post');
   assert.equal(feedPath('everyone'), '/feed/everyone');
   assert.equal(feedPath('following', 'jasmine'), '/jasmine/feed/following');
-  assert.equal(searchPath('slow living'), '/search?search=slow%20living');
+  assert.equal(searchPath('slow living'), '/search');
   assert.equal(postPath('post-1'), '/post/post-1');
 });
 
 test('parses direct account, profile, settings, upload, feed, search, and post links', () => {
   assert.deepEqual(parseAppLocation(locationFor('/createaccount')), { kind: 'create-account' });
   assert.deepEqual(parseAppLocation(locationFor('/accountin')), { kind: 'account-in' });
+  assert.deepEqual(parseAppLocation(locationFor('/humanbehaviour')), { kind: 'human-behaviour' });
   assert.deepEqual(parseAppLocation(locationFor('/Jasmine/')), { kind: 'profile', username: 'jasmine' });
   assert.deepEqual(parseAppLocation(locationFor('/jasmine/setting')), { kind: 'setting', username: 'jasmine' });
   assert.deepEqual(parseAppLocation(locationFor('/jasmine/upload')), { kind: 'upload', username: 'jasmine', uploadMode: null });
@@ -38,6 +39,7 @@ test('parses direct account, profile, settings, upload, feed, search, and post l
   assert.deepEqual(parseAppLocation(locationFor('/jasmine/upload/short-video-post')), { kind: 'upload', username: 'jasmine', uploadMode: 'short-video' });
   assert.deepEqual(parseAppLocation(locationFor('/jasmine/feed/following')), { kind: 'feed', feedMode: 'following', username: 'jasmine' });
   assert.deepEqual(parseAppLocation(locationFor('/search', '?search=slow%20living')), { kind: 'search', query: 'slow living' });
+  assert.deepEqual(parseAppLocation(locationFor('/search')), { kind: 'search', query: null });
   assert.deepEqual(parseAppLocation(locationFor('/post/post-1')), { kind: 'post', postId: 'post-1' });
 });
 

@@ -11,6 +11,16 @@ export const verifyAccessToken = (token) => jwt.verify(token, config.jwtSecret, 
   issuer: 'social-media-mother', audience: 'social-media-mother-web'
 });
 
+export const signAnalyticsToken = (email) => jwt.sign(
+  { sub: email, purpose: 'human-behaviour-team' },
+  config.jwtSecret,
+  { expiresIn: '8h', issuer: 'social-media-mother', audience: 'social-media-mother-analytics' }
+);
+
+export const verifyAnalyticsToken = (token) => jwt.verify(token, config.jwtSecret, {
+  issuer: 'social-media-mother', audience: 'social-media-mother-analytics'
+});
+
 export const signOtpVerification = ({ challengeId, channel, destination }) => jwt.sign(
   { sub: challengeId, channel, destination, purpose: 'otp-verification' },
   config.otpSecret,
@@ -20,4 +30,3 @@ export const signOtpVerification = ({ challengeId, channel, destination }) => jw
 export const verifyOtpVerification = (token) => jwt.verify(token, config.otpSecret, {
   issuer: 'social-media-mother', audience: 'social-media-mother-signup'
 });
-

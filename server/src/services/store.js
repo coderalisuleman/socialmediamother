@@ -310,7 +310,7 @@ export const createPost = async (data) => {
   }
   const date = nowIso();
   const post = {
-    id: makeId(), ...clone(data), hugCount: 0, throwCount: 0, viewCount: 0,
+    id: makeId(), ...clone(data), hugCount: 0, throwCount: 0, viewCount: 0, commentCount: 0,
     deletedAt: null, createdAt: date, updatedAt: date
   };
   memory.posts.set(post.id, post);
@@ -490,6 +490,7 @@ export const createComment = async (postId, authorId, body) => {
   if (!post) throw new AppError(404, 'Post not found', 'POST_NOT_FOUND');
   if (config.storageMode === 'mongodb') {
     const created = await Comment.create({ post: postId, author: authorId, body });
+    await Post.updateOne({ _id: postId, deletedAt: null }, { $inc: { commentCount: 1 } });
     const populated = await Comment.findById(created._id)
       .populate('author', 'fullName username gender bio profileImageFileId followerCount followingCount').lean();
     return asPlainComment(populated);
@@ -497,6 +498,8 @@ export const createComment = async (postId, authorId, body) => {
   const date = nowIso();
   const comment = { id: makeId(), post: String(postId), author: String(authorId), body, createdAt: date, updatedAt: date };
   memory.comments.set(comment.id, comment);
+  const rawPost = memory.posts.get(String(postId));
+  if (rawPost) rawPost.commentCount = Number(rawPost.commentCount || 0) + 1;
   const value = clone(comment);
   value.author = clone(memory.users.get(String(authorId)));
   if (value.author) delete value.author.passwordHash;
@@ -526,11 +529,22 @@ export const updateComment = async (commentId, authorId, body) => {
 export const deleteComment = async (commentId, authorId) => {
   if (config.storageMode === 'mongodb') {
     if (!mongoose.isValidObjectId(commentId)) return false;
-    return Boolean(await Comment.findOneAndDelete({ _id: commentId, author: authorId }));
+    const removed = await Comment.findOneAndDelete({ _id: commentId, author: authorId }).lean();
+    if (!removed) return false;
+    await Post.updateOne({ _id: removed.post }, [{
+      $set: {
+        commentCount: {
+          $max: [0, { $subtract: [{ $ifNull: ['$commentCount', 0] }, 1] }]
+        }
+      }
+    }]);
+    return true;
   }
   const comment = memory.comments.get(String(commentId));
   if (!comment || comment.author !== String(authorId)) return false;
   memory.comments.delete(String(commentId));
+  const rawPost = memory.posts.get(String(comment.post));
+  if (rawPost) rawPost.commentCount = Math.max(0, Number(rawPost.commentCount || 0) - 1);
   return true;
 };
 

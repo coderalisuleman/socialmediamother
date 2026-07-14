@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Compass, Sparkles, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Compass, ShieldAlert, Sparkles, X } from 'lucide-react';
 import Nav from './components/Nav';
 import BottomDock from './components/BottomDock';
 import UploadModal from './components/UploadModal';
@@ -7,8 +7,11 @@ import { CreateAccountModal, LoginModal } from './components/AuthModals';
 import ProfilePage from './components/ProfileModal';
 import SearchPanel from './components/SearchPanel';
 import SiteFooter from './components/SiteFooter';
+import HumanBehaviourPage from './components/HumanBehaviourPage';
 import { EmptyFeed, FeedCard, FeedSkeleton, LoadMore } from './components/Feed';
 import { api, normalizePostShape, normalizePostsResponse, normalizeUserShape, setToken } from './lib/api';
+import { startAnalytics, trackAnalytics } from './lib/analytics';
+import { movePostDrafts } from './lib/drafts';
 import {
   currentUrlPath,
   fallbackPathForRoute,
@@ -48,6 +51,7 @@ export default function App() {
   const [user, setUser] = useState(readLocalUser);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [pageError, setPageError] = useState(null);
   const [cursor, setCursor] = useState(null);
   const [done, setDone] = useState(false);
   const [followingFallback, setFollowingFallback] = useState(false);
@@ -57,8 +61,45 @@ export default function App() {
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [focusedPost, setFocusedPost] = useState(null);
   const [accountCreated, setAccountCreated] = useState(false);
+  const [appReady, setAppReady] = useState(false);
+  const [connection, setConnection] = useState(() => navigator.onLine ? 'online' : 'offline');
+  const [draftToEdit, setDraftToEdit] = useState(null);
+  const [leavePrompt, setLeavePrompt] = useState(null);
+  const unsavedRef = useRef(false);
+  const dirtySourcesRef = useRef(new Map());
+  const restoringHistoryRef = useRef(false);
+  const analyticsRef = useRef(null);
 
-  const navigate = useCallback((path, { replace = false, overlay = false } = {}) => {
+  const markUnsavedChanges = useCallback((source, value) => {
+    dirtySourcesRef.current.set(source, Boolean(value));
+    const dirty = [...dirtySourcesRef.current.values()].some(Boolean);
+    unsavedRef.current = dirty;
+  }, []);
+
+  useEffect(() => {
+    const ready = () => window.requestAnimationFrame(() => setAppReady(true));
+    if (document.readyState === 'complete') ready();
+    else window.addEventListener('load', ready, { once: true });
+    const updateConnection = () => setConnection(navigator.onLine ? 'online' : 'offline');
+    window.addEventListener('online', updateConnection);
+    window.addEventListener('offline', updateConnection);
+    return () => {
+      window.removeEventListener('load', ready);
+      window.removeEventListener('online', updateConnection);
+      window.removeEventListener('offline', updateConnection);
+    };
+  }, []);
+
+  const clearUnsavedChanges = useCallback(() => {
+    dirtySourcesRef.current.clear();
+    unsavedRef.current = false;
+  }, []);
+
+  const navigate = useCallback((path, { replace = false, overlay = false, force = false } = {}) => {
+    if (unsavedRef.current && !force) {
+      setLeavePrompt({ type: 'navigate', path, options: { replace, overlay } });
+      return false;
+    }
     const previousPath = currentUrlPath();
     const previousState = window.history.state || {};
     const currentRoute = parseAppLocation();
@@ -79,11 +120,12 @@ export default function App() {
     window.history[replace ? 'replaceState' : 'pushState'](state, '', path);
     setRoute(parseAppLocation());
     if (!overlay) window.scrollTo({ top: 0, behavior: 'auto' });
+    return true;
   }, []);
 
-  const closeModal = useCallback(() => {
+  const performCloseModal = useCallback(() => {
     if (window.history.state?.motherDirectOverlay) {
-      navigate(window.history.state.motherReturnTo || fallbackPathForRoute(parseAppLocation()), { replace: true });
+      navigate(window.history.state.motherReturnTo || fallbackPathForRoute(parseAppLocation()), { replace: true, force: true });
       return;
     }
     const depth = Number(window.history.state?.motherOverlayDepth || 0);
@@ -91,16 +133,45 @@ export default function App() {
       window.history.go(-depth);
       return;
     }
-    navigate(fallbackPathForRoute(parseAppLocation()), { replace: true });
+    navigate(fallbackPathForRoute(parseAppLocation()), { replace: true, force: true });
   }, [navigate]);
+
+  const closeModal = useCallback(() => {
+    if (unsavedRef.current) {
+      setLeavePrompt({ type: 'close' });
+      return;
+    }
+    performCloseModal();
+  }, [performCloseModal]);
 
   const openOverlay = useCallback((path, options = {}) => {
     navigate(path, { ...options, overlay: true });
   }, [navigate]);
 
+  useEffect(() => {
+    analyticsRef.current = startAnalytics();
+    return () => analyticsRef.current?.stop();
+  }, []);
+
+  useEffect(() => {
+    analyticsRef.current?.page(window.location.pathname);
+  }, [route]);
+
+  const continueLeaving = useCallback(() => {
+    const pending = leavePrompt;
+    clearUnsavedChanges();
+    setLeavePrompt(null);
+    if (!pending) return;
+    window.requestAnimationFrame(() => {
+      if (pending.type === 'close') performCloseModal();
+      else navigate(pending.path, { ...(pending.options || {}), force: true });
+    });
+  }, [clearUnsavedChanges, leavePrompt, navigate, performCloseModal]);
+
   const loadFeed = useCallback(async () => {
     setLoading(true);
     setNotice('');
+    setPageError(null);
     setFollowingFallback(false);
     try {
       let payload = normalizePostsResponse(await api.listPosts({ feed: feedMode, limit: 5 }));
@@ -118,6 +189,10 @@ export default function App() {
       setDone(true);
       setFollowingFallback(feedMode === 'following' && !user);
       setNotice(error.message || 'The feed could not be loaded. Please refresh and try again.');
+      setPageError({
+        title: navigator.onLine ? 'The posts could not be loaded.' : 'Your internet connection is offline.',
+        message: navigator.onLine ? (error.message || 'The server did not answer this request.') : 'Reconnect to the internet, then choose Retry.',
+      });
     } finally {
       setLoading(false);
     }
@@ -151,9 +226,54 @@ export default function App() {
   }, [accountCreated]);
 
   useEffect(() => {
-    const onPopState = () => setRoute(parseAppLocation());
+    const initialRoute = parseAppLocation();
+    if (!['create-account', 'account-in', 'upload'].includes(initialRoute.kind) || window.history.state?.motherOverlay) return;
+    const requestedPath = currentUrlPath();
+    const returnTo = fallbackPathForRoute(initialRoute);
+    window.history.replaceState({}, '', returnTo);
+    window.history.pushState({
+      motherOverlay: true,
+      motherDirectOverlay: true,
+      motherReturnTo: returnTo,
+      motherOverlayDepth: 1,
+    }, '', requestedPath);
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (restoringHistoryRef.current) {
+        restoringHistoryRef.current = false;
+        return;
+      }
+      if (unsavedRef.current) {
+        const requestedPath = currentUrlPath();
+        restoringHistoryRef.current = true;
+        window.history.forward();
+        setLeavePrompt({ type: 'navigate', path: requestedPath, options: { replace: false, overlay: false } });
+        return;
+      }
+      setRoute(parseAppLocation());
+    };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    let interacted = false;
+    const markInteraction = () => { interacted = true; };
+    const warnBeforeLeaving = (event) => {
+      if (!interacted && !unsavedRef.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('pointerdown', markInteraction, { once: true });
+    window.addEventListener('keydown', markInteraction, { once: true });
+    window.addEventListener('beforeunload', warnBeforeLeaving);
+    return () => {
+      window.removeEventListener('pointerdown', markInteraction);
+      window.removeEventListener('keydown', markInteraction);
+      window.removeEventListener('beforeunload', warnBeforeLeaving);
+    };
   }, []);
 
   useEffect(() => {
@@ -164,11 +284,12 @@ export default function App() {
       return undefined;
     }
 
-    setQuery(route.kind === 'search' ? route.query || '' : '');
+    if (route.kind !== 'search') setQuery('');
+    else if (route.query != null) setQuery(route.query);
     setFocusedPost(null);
 
     if (route.kind === 'feed') setFeedMode(route.feedMode || 'everyone');
-    if (route.kind === 'home' || route.kind === 'search' || route.kind === 'post' || route.kind === 'not-found') {
+    if (route.kind === 'home' || route.kind === 'search' || route.kind === 'post' || route.kind === 'human-behaviour' || route.kind === 'not-found') {
       setModal(null);
       setProfileEditing(false);
     }
@@ -226,7 +347,8 @@ export default function App() {
       else setSelectedPerson((current) => current?.username === route.username ? current : null);
       setProfileEditing(editing);
       document.title = `${editing ? 'Settings' : `@${route.username}`} | Mother`;
-      api.getUser(route.username).then((person) => {
+      const personRequest = user?.username === route.username ? Promise.resolve(user) : api.getUser(route.username);
+      personRequest.then((person) => {
         if (active && person) setSelectedPerson(person);
       }).catch(() => {
         if (active && !localPerson) setNotice('That shared profile could not be found.');
@@ -242,6 +364,8 @@ export default function App() {
       });
     } else if (route.kind === 'search') {
       document.title = `${route.query || 'Search'} | Mother`;
+    } else if (route.kind === 'human-behaviour') {
+      document.title = 'Human-behaviour team | Mother';
     } else if (route.kind === 'feed') {
       document.title = `${route.feedMode === 'following' ? 'My people' : "Everyone's posts"} | Mother`;
     } else {
@@ -278,7 +402,7 @@ export default function App() {
     }
   };
 
-  const createPost = async (values, onUploadProgress) => {
+  const createPost = async (values, onUploadProgress, onUploadControl, onUploadState) => {
     const form = new FormData();
     form.append('type', values.type);
     form.append('nameIt', values.type === 'text' ? '' : values.name || '');
@@ -288,13 +412,21 @@ export default function App() {
     values.files.forEach((file) => form.append('files', file));
 
     try {
-      const payload = await api.createPost(form, { onUploadProgress });
+      const payload = await api.createPost(form, { onUploadProgress, onUploadControl, onUploadState });
       const post = normalizePostShape(payload?.post || payload?.data?.post || payload?.data || payload);
       setPosts((current) => [post, ...current]);
+      setDraftToEdit(null);
       return;
     } catch (error) {
       throw error;
     }
+  };
+
+  const deletePost = async (post) => {
+    await api.deletePost(post.id);
+    setPosts((current) => current.filter((item) => item.id !== post.id));
+    setFocusedPost((current) => current?.id === post.id ? null : current);
+    setNotice('Your post was deleted.');
   };
 
   const register = async (values) => {
@@ -308,6 +440,7 @@ export default function App() {
     setUser(nextUser);
     saveLocalUser(nextUser);
     setAccountCreated(true);
+    markUnsavedChanges('create-account', false);
     navigate('/');
   };
 
@@ -345,6 +478,7 @@ export default function App() {
     patchPerson(person.id, updater);
     try {
       const payload = await api.setFollowing(person.username, nextFollowing);
+      trackAnalytics(nextFollowing ? 'creator_follow' : 'creator_unfollow', { targetType: 'user', targetId: person.id, postAuthorId: person.id });
       const confirmed = normalizeUserShape(payload?.person);
       if (confirmed) patchPerson(person.id, () => confirmed);
       const confirmedMe = normalizeUserShape(payload?.me);
@@ -425,6 +559,26 @@ export default function App() {
     saveLocalUser(next);
   };
 
+  const updateProfileDetails = async (changes) => {
+    const previousUsername = user?.username;
+    const payload = await api.updateProfile(changes);
+    const next = normalizeUser(payload, null);
+    if (!next) throw new Error('The changed account response was incomplete.');
+    setUser(next);
+    setSelectedPerson(next);
+    setPosts((current) => current.map((post) => post.author?.id === next.id || post.author?.username === previousUsername
+      ? { ...post, author: next }
+      : post));
+    saveLocalUser(next);
+    markUnsavedChanges('profile', false);
+    if (previousUsername !== next.username) {
+      await movePostDrafts(previousUsername, next.username).catch(() => {});
+      navigate(settingPath(next.username), { replace: true, force: true });
+    }
+    setNotice('Your account details were changed. Your posts and people stayed with your account.');
+    return next;
+  };
+
   const requireAccount = () => {
     if (user) {
       setToken(null);
@@ -440,7 +594,10 @@ export default function App() {
     setQuery(value);
     const clean = value.trim();
     const currentRoute = parseAppLocation();
-    navigate(searchPath(clean), { replace: currentRoute.kind === 'search' });
+    const target = searchPath(clean);
+    if ((clean && currentRoute.kind !== 'search') || (!clean && currentRoute.kind === 'search')) {
+      navigate(target, { replace: currentRoute.kind === 'search' });
+    }
   };
 
   const changeFeedMode = (mode) => {
@@ -453,7 +610,14 @@ export default function App() {
       openOverlay('/createaccount');
       return;
     }
+    setDraftToEdit(null);
     openOverlay(uploadPath(user.username, mode));
+  };
+
+  const resumeDraft = (draft) => {
+    if (!user || !draft) return;
+    setDraftToEdit(draft);
+    openOverlay(uploadPath(user.username, draft.type));
   };
 
   const changeUploadMode = (mode) => {
@@ -475,10 +639,13 @@ export default function App() {
   const searchActive = query.trim().length > 0;
   const visiblePosts = focusedPost ? [focusedPost] : posts;
   const profileActive = ['profile', 'setting'].includes(route.kind);
+  const humanBehaviourActive = route.kind === 'human-behaviour';
 
   return (
-    <div className="app-shell" id="top">
+    <div className={`app-shell ${appReady ? 'app-ready' : 'app-starting'}`} id="top" aria-busy={!appReady}>
       <a className="skip-link" href="#main-content">Skip to posts</a>
+      {!appReady && <div className="startup-wait" role="status"><span /><strong>Opening Social Media Mother…</strong><small>Please wait while every button becomes ready.</small></div>}
+      {connection === 'offline' && <div className="connection-alert" role="alert"><strong>Your internet is offline.</strong><span>Already loaded things may remain visible. Reconnect, then use Retry on anything that did not load.</span></div>}
       <Nav
         query={query}
         onQuery={changeQuery}
@@ -498,29 +665,43 @@ export default function App() {
         </div>
       )}
 
+      {leavePrompt && (
+        <div className="leave-confirm-layer" role="presentation">
+          <section className="leave-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="leave-confirm-title">
+            <span><ShieldAlert size={25} /></span>
+            <div><h2 id="leave-confirm-title">Your unfinished work will be deleted</h2><p>If you close this, the data you entered or selected will be deleted unless you save the post till later.</p></div>
+            <div className="leave-confirm-actions"><button type="button" className="primary-button" onClick={() => setLeavePrompt(null)}>No, don’t close — I want to complete this</button><button type="button" className="danger-button" onClick={continueLeaving}>Close and delete the unfinished data</button></div>
+          </section>
+        </div>
+      )}
+
       {accountCreated && (
         <div className="account-created-layer" role="status" aria-live="assertive">
           <div className="account-created-card"><span>✓</span><strong>Account is created</strong><small>You are now on the main page.</small></div>
         </div>
       )}
 
-      {profileActive ? (
+      {humanBehaviourActive ? <HumanBehaviourPage /> : profileActive ? (
         <ProfilePage
           person={selectedPerson}
           isOwn={Boolean(user && (String(selectedPerson?.id || '') === String(user.id || '') || selectedPerson?.username === user.username))}
           startEditing={profileEditing}
           onAvatar={updateAvatar}
           onDeleteAvatar={deleteAvatar}
+          onProfileDetails={updateProfileDetails}
           onFollow={follow}
           onEditingChange={changeProfileEditing}
+          onDirtyChange={(value) => markUnsavedChanges('profile', value)}
           onPerson={openPerson}
           onPost={openPost}
+          onDeletePost={deletePost}
+          onResumeDraft={resumeDraft}
           viewer={user}
           onRequireAuth={requireAccount}
           fallbackPosts={posts}
         />
       ) : searchActive ? (
-        <SearchPanel query={query} people={people} posts={posts} onFollow={follow} onPerson={openPerson} onPost={openPost} viewer={user} onRequireAuth={requireAccount} />
+        <SearchPanel query={query} people={people} posts={posts} onFollow={follow} onPerson={openPerson} onPost={openPost} onDeletePost={deletePost} viewer={user} onRequireAuth={requireAccount} />
       ) : (
         <main className="home-layout" id="main-content">
           <section className="feed-section" aria-labelledby="feed-title">
@@ -532,9 +713,11 @@ export default function App() {
               </div>
             </header>
 
-            {loading && !focusedPost ? <FeedSkeleton /> : visiblePosts.length ? (
+            {loading && !focusedPost ? <FeedSkeleton /> : pageError && !focusedPost ? (
+              <section className="page-load-error" role="alert"><strong>{pageError.title}</strong><p>{pageError.message}</p><small>If your internet is slow, wait a moment. If it is disconnected, reconnect first.</small><button type="button" className="primary-button" onClick={loadFeed}>Retry</button></section>
+            ) : visiblePosts.length ? (
               <div className="feed-column">
-                {visiblePosts.map((post, index) => <FeedCard key={post.id} post={post} onFollow={follow} onPerson={openPerson} onPost={openPost} viewer={user} onRequireAuth={requireAccount} priority={index === 0} />)}
+                {visiblePosts.map((post, index) => <FeedCard key={post.id} post={post} onFollow={follow} onPerson={openPerson} onPost={openPost} onDelete={deletePost} viewer={user} onRequireAuth={requireAccount} priority={index === 0} />)}
                 {!focusedPost && <LoadMore loading={loadingMore} done={done} onClick={loadMore} />}
               </div>
             ) : <EmptyFeed following={feedMode === 'following'} onEveryone={() => changeFeedMode('everyone')} />}
@@ -560,13 +743,21 @@ export default function App() {
         onClose={closeModal}
         onCreate={createPost}
         initialMode={route.kind === 'upload' ? route.uploadMode : null}
+        initialDraft={draftToEdit}
+        ownerUsername={user?.username || ''}
         onModeChange={changeUploadMode}
+        onDirtyChange={(value) => markUnsavedChanges('upload', value)}
+        onDraftSaved={() => {
+          setDraftToEdit(null);
+          setNotice('Saved till and complete later. Only you can see it in your Me page.');
+        }}
       />
       <CreateAccountModal
         open={modal === 'create'}
         onClose={closeModal}
         onRegister={register}
         onSwitchLogin={() => openOverlay('/accountin', { replace: true })}
+        onDirtyChange={(value) => markUnsavedChanges('create-account', value)}
       />
       <LoginModal
         open={modal === 'login'}
@@ -577,6 +768,7 @@ export default function App() {
         }}
         onSwitchCreate={() => openOverlay('/createaccount', { replace: true })}
         currentUser={user}
+        onDirtyChange={(value) => markUnsavedChanges('account-in', value)}
       />
     </div>
   );

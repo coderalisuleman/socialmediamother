@@ -12,6 +12,7 @@ export const RESERVED_USERNAMES = Object.freeze([
   'feed',
   'health',
   'home',
+  'humanbehaviour',
   'login',
   'logout',
   'manifest',
@@ -62,6 +63,7 @@ export const classifyPagePath = (value) => {
     const segment = segments[0].toLowerCase();
     if (segment === 'createaccount') return privateRoute('createaccount', '/createaccount');
     if (segment === 'accountin') return privateRoute('accountin', '/accountin');
+    if (segment === 'humanbehaviour') return privateRoute('humanbehaviour', '/humanbehaviour');
     if (isPublicUsername(segment)) return { kind: 'profile', username: segment, path: `/${segment}` };
     return { kind: 'unknown' };
   }

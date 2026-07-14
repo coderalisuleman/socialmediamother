@@ -1,4 +1,4 @@
-import { verifyAccessToken } from '../services/tokens.js';
+import { verifyAccessToken, verifyAnalyticsToken } from '../services/tokens.js';
 import { findUserById } from '../services/store.js';
 import { AppError } from '../utils/errors.js';
 
@@ -36,3 +36,15 @@ export const requireAuth = async (req, _res, next) => {
   }
 };
 
+export const requireAnalyticsTeam = (req, _res, next) => {
+  try {
+    const token = tokenFromRequest(req);
+    if (!token) throw new AppError(401, 'Human-behaviour team account-in is required', 'ANALYTICS_AUTH_REQUIRED');
+    const payload = verifyAnalyticsToken(token);
+    if (payload.purpose !== 'human-behaviour-team') throw new AppError(401, 'Invalid human-behaviour token', 'INVALID_ANALYTICS_TOKEN');
+    req.analyticsTeam = payload;
+    next();
+  } catch (error) {
+    next(error);
+  }
+};

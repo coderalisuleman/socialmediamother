@@ -16,6 +16,8 @@ import { postsRouter } from './routes/posts.js';
 import { feedRouter } from './routes/feed.js';
 import { searchRouter } from './routes/search.js';
 import { filesRouter } from './routes/files.js';
+import { uploadsRouter } from './routes/uploads.js';
+import { analyticsRouter } from './routes/analytics.js';
 import { AppError, errorHandler, notFound } from './utils/errors.js';
 import { findUserByIdentifier, getPostById, listSitemapEntities } from './services/store.js';
 import { classifyPagePath, postPath, profilePath } from './utils/publicRoutes.js';
@@ -133,6 +135,7 @@ export const metadataForRoute = async (route) => {
     const privateTitles = {
       createaccount: 'Create your account',
       accountin: 'Account in',
+      humanbehaviour: 'Human-behaviour team',
       setting: 'Account settings',
       upload: 'Upload a post',
       'upload-format': `Upload ${String(route.format || 'post').replaceAll('-', ' ')}`
@@ -183,7 +186,9 @@ export const createApp = () => {
         fontSrc: ["'self'", 'data:'],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
-        formAction: ["'self'"]
+        formAction: ["'self'"],
+        // Render is HTTPS. Keep local production smoke tests on HTTP usable.
+        upgradeInsecureRequests: config.isRender ? [] : null
       }
     } : false
   }));
@@ -232,6 +237,8 @@ export const createApp = () => {
   app.use('/api/feed', feedRouter);
   app.use('/api/search', searchRouter);
   app.use('/api/files', filesRouter);
+  app.use('/api/uploads', uploadsRouter);
+  app.use('/api/analytics', analyticsRouter);
 
   if (config.isProduction) {
     app.get('/robots.txt', (_req, res) => {
@@ -242,6 +249,7 @@ export const createApp = () => {
         'Disallow: /api/',
         'Disallow: /createaccount',
         'Disallow: /accountin',
+        'Disallow: /humanbehaviour',
         'Disallow: /*/setting',
         'Disallow: /*/upload',
         `Sitemap: ${canonicalOrigin}/sitemap.xml`,

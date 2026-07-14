@@ -46,6 +46,7 @@ export const publicPost = (post, { viewerReaction = null, viewerFollowsAuthor = 
   hugCount: Number(post.hugCount || 0),
   throwCount: Number(post.throwCount || 0),
   viewCount: Number(post.viewCount || 0),
+  commentCount: Number(post.commentCount || 0),
   viewerReaction,
   ...(score != null ? { recommendationScore: Number(score.toFixed(4)) } : {}),
   createdAt: post.createdAt,

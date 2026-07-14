@@ -55,6 +55,10 @@ export const config = Object.freeze({
     .filter(Boolean),
   jwtSecret: process.env.JWT_SECRET || 'local-only-social-media-mother-jwt-secret',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || process.env.JWT_EXPIRES || '7d',
+  analytics: {
+    teamEmail: (process.env.ANALYTICS_TEAM_EMAIL || 'businessalisuleman@gmail.com').trim().toLowerCase(),
+    passwordHash: process.env.ANALYTICS_TEAM_PASSWORD_HASH?.trim() || '',
+  },
   otpSecret: process.env.OTP_SECRET || process.env.JWT_SECRET || 'local-only-social-media-mother-otp-secret',
   otpTtlMinutes: asPositiveInt(process.env.OTP_TTL_MINUTES, 10),
   aws: {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, ImagePlus, LoaderCircle, Trash2, UserMinus, UserPlus, UsersRound, X } from 'lucide-react';
+import { BookOpenText, Camera, Download, FileClock, ImagePlus, LoaderCircle, Play, Save, Trash2, UserMinus, UserPlus, UsersRound, X } from 'lucide-react';
 import { api, normalizePostShape, normalizeUserShape } from '../lib/api';
+import { deletePostDraft, listPostDrafts } from '../lib/drafts';
 import { Avatar, FeedCard } from './Feed';
 
 function exactCount(value) {
@@ -12,9 +13,43 @@ const postFilters = [
   ['photo', 'My Photo Posts'],
   ['video', 'My Video Posts'],
   ['short-video', 'My Short Video Posts'],
+  ['drafts', 'Saved till and complete later'],
+  ['fans', 'Fans-behaviour'],
 ];
 
-export default function ProfilePage({ person, isOwn, startEditing = false, onAvatar, onDeleteAvatar, onFollow, onEditingChange, onPerson, onPost, viewer, onRequireAuth, fallbackPosts = [] }) {
+function CreatorFansBehaviour() {
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    api.creatorAnalytics().then((payload) => active && setReport(payload)).catch((loadError) => active && setError(loadError.message || 'Fans-behaviour could not be gathered.')).finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, []);
+
+  if (loading) return <div className="profile-post-loading"><LoaderCircle className="spin" /> Reading fans’ behaviour…</div>;
+  if (error) return <p className="form-error" role="alert">{error}</p>;
+  const totals = report?.totals || {};
+  const metric = (label, value) => <article><strong>{Number(value || 0).toLocaleString('en-US').replaceAll(',', '')}</strong><span>{label}</span></article>;
+  const exportPdf = () => {
+    document.body.classList.add('printing-fans-behaviour');
+    const cleanup = () => document.body.classList.remove('printing-fans-behaviour');
+    window.addEventListener('afterprint', cleanup, { once: true });
+    window.print();
+    window.setTimeout(cleanup, 1500);
+  };
+
+  return (
+    <div className="fans-report">
+      <header><div className="reading-report-art"><BookOpenText size={32} /><span>♥</span></div><div><h2>Fans-behaviour</h2><p>Collective and individual behaviour from the last {report?.periodDays || 90} days.</p></div><button type="button" className="draft-save-button" onClick={exportPdf}><Download size={16} /> Export this report as PDF</button></header>
+      <div className="fans-metrics">{metric('post formats', totals.posts)}{metric('viewers', totals.views)}{metric('hugs', totals.hugs)}{metric('throws', totals.throws)}{metric('sent thoughts', totals.thoughts)}{metric('watching seconds', totals.watchingSeconds)}{metric('people with you now', report?.followers)}</div>
+      <section className="individual-performance"><h3>Every post by itself</h3>{report?.individual?.length ? report.individual.map((post) => <article key={post.id}><div><strong>{post.name}</strong><small>{post.type.replace('-', ' ')} · {new Date(post.createdAt).toLocaleDateString()}</small></div><span><b>{post.views}</b> viewers</span><span><b>{post.hugs}</b> hugs</span><span><b>{post.throws}</b> throws</span><span><b>{post.thoughts}</b> thoughts</span><span><b>{post.watchingSeconds}</b> watch seconds</span><span><b>{post.followersGained}</b> people gained</span></article>) : <p>No published posts have behaviour to read yet.</p>}</section>
+    </div>
+  );
+}
+
+export default function ProfilePage({ person, isOwn, startEditing = false, onAvatar, onDeleteAvatar, onProfileDetails, onFollow, onEditingChange, onDirtyChange, onPerson, onPost, onDeletePost, onResumeDraft, viewer, onRequireAuth, fallbackPosts = [] }) {
   const [editing, setEditing] = useState(startEditing);
   const [preview, setPreview] = useState(null);
   const [file, setFile] = useState(null);
@@ -25,7 +60,10 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
   const [relationshipLoading, setRelationshipLoading] = useState(false);
   const [postType, setPostType] = useState('text');
   const [profilePosts, setProfilePosts] = useState([]);
+  const [drafts, setDrafts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(true);
+  const [profileDetails, setProfileDetails] = useState({ fullName: '', username: '', email: '', phone: '' });
+  const [detailsSaving, setDetailsSaving] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -33,7 +71,25 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
     setRelationshipView(null);
     setRelationshipPeople([]);
     setPostType('text');
+    setProfileDetails({
+      fullName: person?.fullName || person?.name || '',
+      username: person?.username || '',
+      email: person?.email || '',
+      phone: person?.phone || '',
+    });
   }, [person?.username, startEditing]);
+
+  const profileDirty = Boolean(editing && (
+    file
+    || profileDetails.fullName !== (person?.fullName || person?.name || '')
+    || profileDetails.username !== (person?.username || '')
+    || profileDetails.email !== (person?.email || '')
+    || profileDetails.phone !== (person?.phone || '')
+  ));
+
+  useEffect(() => {
+    onDirtyChange?.(profileDirty);
+  }, [onDirtyChange, profileDirty]);
 
   useEffect(() => {
     if (!file) {
@@ -53,6 +109,21 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
     if (!person?.username) return undefined;
     let active = true;
     setPostsLoading(true);
+    if (postType === 'drafts') {
+      listPostDrafts(person.username).then((items) => {
+        if (active) setDrafts(items);
+      }).catch((loadError) => {
+        if (active) {
+          setDrafts([]);
+          setError(loadError.message || 'Your saved drafts could not be opened.');
+        }
+      }).finally(() => active && setPostsLoading(false));
+      return () => { active = false; };
+    }
+    if (postType === 'fans') {
+      setPostsLoading(false);
+      return () => { active = false; };
+    }
     api.listUserPosts(person.username, postType).then((payload) => {
       if (active) setProfilePosts(payload.posts || []);
     }).catch(() => {
@@ -87,6 +158,7 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
       await onAvatar(file);
       setFile(null);
       setEditing(false);
+      onDirtyChange?.(false);
       onEditingChange?.(false);
     } catch (saveError) {
       setError(saveError.message || 'That photo could not be changed.');
@@ -102,11 +174,30 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
       await onDeleteAvatar();
       setFile(null);
       setEditing(false);
+      onDirtyChange?.(false);
       onEditingChange?.(false);
     } catch (removeError) {
       setError(removeError.message || 'That photo could not be removed.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveDetails = async () => {
+    setDetailsSaving(true);
+    setError('');
+    try {
+      await onProfileDetails?.({
+        fullName: profileDetails.fullName.trim(),
+        username: profileDetails.username.trim(),
+        email: profileDetails.email.trim(),
+        phone: profileDetails.phone.trim(),
+      });
+      onDirtyChange?.(false);
+    } catch (detailsError) {
+      setError(detailsError.message || 'Those account details could not be changed.');
+    } finally {
+      setDetailsSaving(false);
     }
   };
 
@@ -132,7 +223,7 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
           {isOwn ? (
             <button type="button" className="secondary-button profile-change" onClick={() => {
               const next = !editing;
-              setEditing(next);
+              if (!editing || !profileDirty) setEditing(next);
               onEditingChange?.(next);
             }}><Camera size={16} /> Change profile photo</button>
           ) : (
@@ -156,6 +247,13 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
 
         {isOwn && editing && (
           <div className="avatar-editor">
+            <div className="profile-details-editor">
+              <label><span>Full name</span><input value={profileDetails.fullName} maxLength="100" onChange={(event) => setProfileDetails((current) => ({ ...current, fullName: event.target.value }))} /></label>
+              <label><span>Username</span><div className="username-input"><b>@</b><input value={profileDetails.username} maxLength="40" onChange={(event) => setProfileDetails((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/[^a-z]/g, '') }))} /></div></label>
+              <label><span>Phone number</span><input type="tel" value={profileDetails.phone} placeholder="+923254695657" onChange={(event) => setProfileDetails((current) => ({ ...current, phone: event.target.value.replace(/[^\d+\s()-]/g, '') }))} /></label>
+              <label><span>Email address</span><input type="email" value={profileDetails.email} placeholder="you@example.com" onChange={(event) => setProfileDetails((current) => ({ ...current, email: event.target.value }))} /></label>
+              <button type="button" className="primary-button" onClick={saveDetails} disabled={detailsSaving || !profileDetails.fullName || !profileDetails.username}>{detailsSaving ? <LoaderCircle className="spin" size={16} /> : <Save size={16} />} Save account details</button>
+            </div>
             <div className="avatar-drop" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
               event.preventDefault();
               const next = [...event.dataTransfer.files].find((item) => item.type.startsWith('image/'));
@@ -180,10 +278,20 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
       <section className="profile-posts" aria-labelledby="profile-posts-title">
         <h2 id="profile-posts-title" className="sr-only">{isOwn ? 'My posts' : `${person.name}'s posts`}</h2>
         <div className="profile-post-tabs" role="tablist" aria-label="Choose a post format">
-          {postFilters.map(([type, label]) => <button type="button" role="tab" aria-selected={postType === type} className={postType === type ? 'active' : ''} key={type} onClick={() => setPostType(type)}>{isOwn ? label : label.replace('My', `${person.name}'s`)}</button>)}
+          {postFilters.filter(([type]) => isOwn || !['drafts', 'fans'].includes(type)).map(([type, label]) => <button type="button" role="tab" aria-selected={postType === type} className={postType === type ? 'active' : ''} key={type} onClick={() => setPostType(type)}>{isOwn ? label : label.replace('My', `${person.name}'s`)}</button>)}
         </div>
-        {postsLoading ? <div className="profile-post-loading"><LoaderCircle className="spin" /> Gathering posts…</div> : profilePosts.length ? (
-          <div className="feed-column">{profilePosts.map((post, index) => <FeedCard key={post.id} post={post} onPerson={onPerson} onPost={onPost} viewer={viewer} onRequireAuth={onRequireAuth} priority={index === 0} />)}</div>
+        {postsLoading ? <div className="profile-post-loading"><LoaderCircle className="spin" /> Gathering posts…</div> : postType === 'drafts' ? (
+          drafts.length ? <div className="draft-list">{drafts.map((draft) => (
+            <article className="draft-card" key={draft.id}>
+              <span className="draft-format"><FileClock size={20} /><b>{draft.type.replace('-', ' ')}</b></span>
+              <div><strong>{draft.type === 'text' ? draft.text?.split('\n')[0] || 'Unfinished text post' : draft.name || `Unfinished ${draft.type}`}</strong><small>Saved {new Date(draft.updatedAt).toLocaleString()}</small><p>{draft.files?.length ? `${draft.files.length} selected ${draft.files.length === 1 ? 'file' : 'files'}` : 'No media selected yet'}</p></div>
+              <div className="draft-actions"><button type="button" className="primary-button" onClick={() => onResumeDraft?.(draft)}><Play size={15} /> Complete it</button><button type="button" className="danger-button" onClick={async () => { await deletePostDraft(draft.id); setDrafts((current) => current.filter((item) => item.id !== draft.id)); }}><Trash2 size={15} /> Delete</button></div>
+            </article>
+          ))}</div> : <div className="profile-post-empty">No saved things to complete later.</div>
+        ) : postType === 'fans' ? (
+          <CreatorFansBehaviour />
+        ) : profilePosts.length ? (
+          <div className="feed-column">{profilePosts.map((post, index) => <FeedCard key={post.id} post={post} onPerson={onPerson} onPost={onPost} onDelete={async (item) => { await onDeletePost?.(item); setProfilePosts((current) => current.filter((candidate) => candidate.id !== item.id)); }} viewer={viewer} onRequireAuth={onRequireAuth} priority={index === 0} />)}</div>
         ) : <div className="profile-post-empty">No {postType.replace('-', ' ')} posts yet.</div>}
       </section>
     </main>

@@ -29,6 +29,10 @@ services:
         value: 7d
       - key: OTP_TTL_MINUTES
         value: "10"
+      - key: ANALYTICS_TEAM_EMAIL
+        value: businessalisuleman@gmail.com
+      - key: ANALYTICS_TEAM_PASSWORD_HASH
+        sync: false
       - key: AWS_REGION
         sync: false
       - key: AWS_ACCESS_KEY_ID

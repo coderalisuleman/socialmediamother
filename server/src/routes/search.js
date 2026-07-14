@@ -11,6 +11,11 @@ export const searchRouter = express.Router();
 
 const normalize = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 const words = (value) => normalize(value).split(' ').filter(Boolean);
+const containsEveryWord = (query, text) => {
+  const tokens = words(query).filter((token) => token !== 'by');
+  const target = normalize(text);
+  return tokens.length === 0 || tokens.every((token) => target.includes(token));
+};
 
 const textScore = (query, text) => {
   const q = normalize(query);
@@ -35,10 +40,10 @@ searchRouter.get('/', optionalAuth, asyncHandler(async (req, res) => {
   const byMatch = query.match(/\bby\s+(@?)([a-z]{1,40})(?=\s|$)/i);
   const byUsername = byMatch?.[1] === '@' ? byMatch[2].toLowerCase() : null;
   const byName = byMatch?.[1] !== '@' ? byMatch?.[2] : null;
-  const contentQuery = query.replace(/\bby\s+@?[a-z]{1,40}(?=\s|$)/ig, '').replace(/@[a-z]{1,40}/ig, '').trim() || query;
+  const contentQuery = query.replace(/\bby\s+@?[a-z]{1,40}(?=\s|$)/ig, '').replace(/@[a-z]{1,40}/ig, '').trim();
 
   const [direct, authorPosts, exactUser] = await Promise.all([
-    searchCandidates({ query: contentQuery, type }),
+    searchCandidates({ query: contentQuery || query, type }),
     postsByMatchingAuthors({ usernames: [byUsername || exactAt].filter(Boolean), names: [byName].filter(Boolean), type }),
     byUsername || exactAt ? findUserByIdentifier(byUsername || exactAt) : null
   ]);
@@ -55,7 +60,10 @@ searchRouter.get('/', optionalAuth, asyncHandler(async (req, res) => {
   }).sort((a, b) => b.score - a.score || a.user.username.localeCompare(b.user.username));
 
   const postsById = new Map([...direct.posts, ...authorPosts].map((post) => [post.id, post]));
-  const ranked = [...postsById.values()].map((post) => {
+  const ranked = [...postsById.values()].filter((post) => {
+    if (!contentQuery) return Boolean(byUsername || exactAt || byName);
+    return containsEveryWord(contentQuery, `${post.nameIt} ${post.text} ${post.detail} ${(post.links || []).join(' ')}`);
+  }).map((post) => {
     let score = textScore(contentQuery, `${post.nameIt} ${post.text} ${post.detail} ${(post.links || []).join(' ')}`);
     if (normalize(post.nameIt) === normalize(contentQuery)) score += 500;
     if (byUsername && post.author?.username === byUsername) score += 10_000;

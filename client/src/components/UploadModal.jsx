@@ -1,8 +1,9 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { AlignLeft, ArrowDownToLine, ArrowLeft, CheckCircle2, Film, Image as ImageIcon, Link2, LoaderCircle, Plus, Smartphone, UploadCloud, Video } from 'lucide-react';
+import { AlignLeft, ArrowDownToLine, ArrowLeft, Ban, CheckCircle2, Film, Image as ImageIcon, Link2, LoaderCircle, Pause, Play, Plus, Save, Smartphone, UploadCloud, Video } from 'lucide-react';
 import { useObjectUrls } from '../lib/hooks';
 import { optimizePhoto } from '../lib/media';
 import { formatBytes, formatRemainingTime } from '../lib/uploadProgress';
+import { deletePostDraft, savePostDraft } from '../lib/drafts';
 import Modal from './Modal';
 import { MediaCarousel } from './Feed';
 
@@ -16,9 +17,18 @@ const choices = [
 function UploadProgress({ progress }) {
   if (!progress) return null;
   const failed = progress.status === 'failed';
+  const cancelled = progress.status === 'cancelled';
+  const paused = progress.status === 'paused';
+  const pausing = progress.status === 'pausing';
   const processing = progress.status === 'processing';
   const remainingBytes = Math.max(0, progress.total - progress.loaded);
-  const timeLabel = failed
+  const timeLabel = cancelled
+    ? 'Cancelled — your form and selected files are still here'
+    : paused
+      ? 'Paused — choose resume whenever you are ready'
+      : pausing
+        ? 'Pausing after the current small piece…'
+        : failed
     ? 'Upload stopped — retry when ready'
     : processing
       ? 'Upload sent — finishing your post'
@@ -27,9 +37,9 @@ function UploadProgress({ progress }) {
         : `${formatRemainingTime(progress.remainingSeconds)} left`;
 
   return (
-    <section className={`upload-progress-card ${failed ? 'failed' : ''}`} aria-live="polite">
+    <section className={`upload-progress-card ${failed ? 'failed' : ''} ${cancelled ? 'cancelled' : ''} ${paused || pausing ? 'paused' : ''}`} aria-live="polite">
       <div className="upload-progress-head">
-        <span><UploadCloud size={19} /><strong>{failed ? 'Upload stopped' : processing ? 'Finishing your post' : 'Uploading your post'}</strong></span>
+        <span><UploadCloud size={19} /><strong>{cancelled ? 'Upload cancelled' : paused ? 'Upload paused' : pausing ? 'Pausing upload' : failed ? 'Upload stopped' : processing ? 'Finishing your post' : 'Uploading your post'}</strong></span>
         <b>{progress.percent}%</b>
       </div>
       <div
@@ -136,7 +146,7 @@ const DropField = memo(function DropField({ mode, files, setFiles }) {
   );
 });
 
-export default function UploadModal({ open, onClose, onCreate, initialMode = null, onModeChange }) {
+export default function UploadModal({ open, onClose, onCreate, initialMode = null, initialDraft = null, ownerUsername = '', onModeChange, onDirtyChange, onDraftSaved }) {
   const [mode, setMode] = useState(null);
   const [name, setName] = useState('');
   const [detail, setDetail] = useState('');
@@ -145,17 +155,59 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
   const [files, setFiles] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
+  const [uploadControl, setUploadControl] = useState(null);
+  const [draftId, setDraftId] = useState(null);
+  const [draftSaving, setDraftSaving] = useState(false);
+  const [discardConfirm, setDiscardConfirm] = useState(false);
   const [error, setError] = useState('');
   const textareaRef = useRef(null);
 
   useEffect(() => {
-    if (open) setMode(initialMode || null);
-  }, [initialMode, open]);
+    if (open) return;
+    setMode(null);
+    setName('');
+    setDetail('');
+    setLink('');
+    setText('');
+    setFiles([]);
+    setSubmitting(false);
+    setUploadProgress(null);
+    setUploadControl(null);
+    setDraftId(null);
+    setDraftSaving(false);
+    setError('');
+    setDiscardConfirm(false);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (initialDraft) {
+      setMode(initialDraft.type || initialMode || null);
+      setName(initialDraft.name || '');
+      setDetail(initialDraft.detail || '');
+      setLink(initialDraft.link || '');
+      setText(initialDraft.text || '');
+      setFiles(Array.isArray(initialDraft.files) ? initialDraft.files : []);
+      setDraftId(initialDraft.id || null);
+      return;
+    }
+    setMode(initialMode || null);
+  }, [initialDraft, initialMode, open]);
+
+  useEffect(() => {
+    if (!open) {
+      onDirtyChange?.(false);
+      return;
+    }
+    const dirty = Boolean(mode && (text || name || detail || link || files.length));
+    onDirtyChange?.(dirty);
+  }, [detail, files.length, link, mode, name, onDirtyChange, open, text]);
 
   const chooseMode = (nextMode) => {
     setMode(nextMode);
     setFiles([]);
     setUploadProgress(null);
+    setUploadControl(null);
     setError('');
     onModeChange?.(nextMode);
   };
@@ -168,13 +220,43 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
     setText('');
     setFiles([]);
     setUploadProgress(null);
+    setUploadControl(null);
+    setDraftId(null);
+    setDraftSaving(false);
     setError('');
+    setDiscardConfirm(false);
   };
 
   const close = () => {
     if (submitting) return;
-    reset();
     onClose();
+  };
+
+  const saveDraft = async () => {
+    if (!mode || draftSaving || submitting) return;
+    setDraftSaving(true);
+    setError('');
+    try {
+      const saved = await savePostDraft({
+        id: draftId,
+        ownerUsername,
+        type: mode,
+        name,
+        detail,
+        link,
+        text,
+        files,
+      });
+      setDraftId(saved.id);
+      onDirtyChange?.(false);
+      onDraftSaved?.(saved);
+      reset();
+      onClose();
+    } catch (draftError) {
+      setError(draftError.message || 'This draft could not be saved on your device.');
+    } finally {
+      setDraftSaving(false);
+    }
   };
 
   const insertNewline = () => {
@@ -187,6 +269,21 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
       input.focus();
       input.setSelectionRange(start + 1, start + 1);
     });
+  };
+
+  const goBack = () => {
+    const hasWork = Boolean(text || name || detail || link || files.length);
+    if (hasWork) {
+      setDiscardConfirm(true);
+      return;
+    }
+    chooseMode(null);
+  };
+
+  const discardAndGoBack = () => {
+    onDirtyChange?.(false);
+    reset();
+    onModeChange?.(null);
   };
 
   const submit = async (event) => {
@@ -214,12 +311,14 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
         links: mode === 'text' ? [] : link.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean),
         text: cleanText,
         files,
-      }, setUploadProgress);
+      }, setUploadProgress, setUploadControl, (status) => setUploadProgress((current) => current ? { ...current, status } : current));
+      if (draftId) await deletePostDraft(draftId).catch(() => {});
+      onDirtyChange?.(false);
       reset();
       onClose();
     } catch (submitError) {
-      setUploadProgress((current) => current ? { ...current, status: 'failed' } : null);
-      setError(submitError.message || 'This post could not be shared. Please try again.');
+      setUploadProgress((current) => current ? { ...current, status: submitError?.cancelled ? 'cancelled' : 'failed' } : null);
+      setError(submitError?.cancelled ? '' : submitError.message || 'This post could not be shared. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -239,7 +338,9 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
         </div>
       ) : (
         <form className="upload-form" onSubmit={submit}>
-          <button type="button" className="back-link" onClick={() => chooseMode(null)} disabled={submitting}><ArrowLeft size={21} strokeWidth={2.6} /> Go back</button>
+          <button type="button" className="back-link" onClick={goBack} disabled={submitting}><ArrowLeft size={21} strokeWidth={2.6} /> Go back</button>
+
+          {discardConfirm && <div className="inline-discard-card" role="alertdialog" aria-label="Delete unfinished upload data?"><strong>Your unfinished work will be deleted</strong><p>If you go back now, your writing and selected files will be removed. You can save till later instead.</p><div><button type="button" className="primary-button" onClick={() => setDiscardConfirm(false)}>No, I want to complete this</button><button type="button" className="danger-button" onClick={discardAndGoBack}>Go back and delete it</button></div></div>}
 
           {mode === 'text' ? (
             <div className="text-editor-wrap">
@@ -277,11 +378,22 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
             </div>
           )}
           <UploadProgress progress={uploadProgress} />
+          {submitting && uploadControl && uploadProgress && !['processing', 'cancelled', 'failed'].includes(uploadProgress.status) && (
+            <div className="upload-control-row" aria-label="Upload controls">
+              {['paused', 'pausing'].includes(uploadProgress.status) ? (
+                <button type="button" className="secondary-button" onClick={() => uploadControl.resume()} disabled={uploadProgress.status === 'pausing'}><Play size={16} /> {uploadProgress.status === 'pausing' ? 'Pausing…' : 'Resume upload'}</button>
+              ) : (
+                <button type="button" className="secondary-button" onClick={() => uploadControl.pause()}><Pause size={16} /> Pause upload</button>
+              )}
+              <button type="button" className="cancel-upload-button" onClick={() => uploadControl.cancel()}><Ban size={16} /> Cancel upload</button>
+            </div>
+          )}
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="form-actions">
             <button type="button" className="secondary-button" onClick={close} disabled={submitting}>Cancel</button>
+            <button type="button" className="draft-save-button" onClick={saveDraft} disabled={submitting || draftSaving}><Save size={16} /> {draftSaving ? 'Saving…' : 'Save till and complete later'}</button>
             <button type="submit" className="primary-button" disabled={submitting}>
-              {submitting ? <><LoaderCircle className="spin" size={17} /> {uploadProgress ? uploadProgress.status === 'processing' ? 'Finishing…' : `Uploading ${uploadProgress.percent}%` : 'Posting…'}</> : <><Film size={17} /> Post it</>}
+              {submitting ? <><LoaderCircle className="spin" size={17} /> {uploadProgress ? uploadProgress.status === 'processing' ? 'Finishing…' : uploadProgress.status === 'paused' ? `Paused ${uploadProgress.percent}%` : `Uploading ${uploadProgress.percent}%` : 'Posting…'}</> : <><Film size={17} /> {uploadProgress?.status === 'cancelled' ? 'Start upload again' : 'Post it'}</>}
             </button>
           </div>
         </form>

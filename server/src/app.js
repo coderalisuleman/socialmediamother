@@ -63,7 +63,7 @@ export const injectMetadata = (html, metadata) => {
     `<meta name="description" content="${safe.description}">`,
     `<meta name="robots" content="${safe.robots}">`,
     `<link rel="canonical" href="${safe.url}">`,
-    '<meta property="og:site_name" content="Social Media Mother">',
+    '<meta property="og:site_name" content="SocialMediaMother">',
     `<meta property="og:type" content="${safe.type}">`,
     `<meta property="og:title" content="${safe.title}">`,
     `<meta property="og:description" content="${safe.description}">`,
@@ -89,9 +89,9 @@ export const injectMetadata = (html, metadata) => {
 };
 
 const baseMetadata = {
-  title: 'Social Media Mother — Share thoughts, photos and videos',
+  title: 'SocialMediaMother',
   description: 'A free place where anyone from anywhere can share text, photos, videos, and short videos.',
-  url: `${canonicalOrigin}/`, image: '/brand/mother-og.jpg', imageAlt: 'Social Media Mother heart gesture', type: 'website',
+  url: `${canonicalOrigin}/`, image: '/brand/mother-og.jpg', imageAlt: 'SocialMediaMother creators hugging', type: 'website',
   robots: 'index, follow, max-image-preview:large'
 };
 
@@ -102,7 +102,7 @@ export const metadataForRoute = async (route) => {
     const username = route.username;
     const user = /^[a-z]{1,40}$/.test(username || '') ? await findUserByIdentifier(username) : null;
     if (user?.username === username) return {
-      title: `${user.fullName} (@${user.username}) — Social Media Mother`,
+      title: `${user.fullName} (@${user.username}) | SocialMediaMother`,
       description: (user.bio || `See ${user.fullName}'s posts on Social Media Mother.`).slice(0, 240),
       url: `${canonicalOrigin}${profilePath(user.username)}`,
       image: user.profileImageFileId ? `/api/files/${user.profileImageFileId}` : '/brand/mother-og.jpg',
@@ -118,7 +118,7 @@ export const metadataForRoute = async (route) => {
       const previewImage = post.media?.find((item) => item.contentType?.startsWith('image/'));
       const previewVideo = post.media?.find((item) => item.contentType?.startsWith('video/'));
       return {
-        title: `${leadingText.slice(0, 90)} — @${post.author.username}`,
+        title: `${leadingText.slice(0, 90)} — @${post.author.username} | SocialMediaMother`,
         description: (post.detail || post.text || `See this ${post.type} post on Social Media Mother.`).slice(0, 240),
         url: `${canonicalOrigin}${postPath(post.id)}`,
         image: previewImage?.fileId ? `/api/files/${previewImage.fileId}` : post.author.profileImageFileId ? `/api/files/${post.author.profileImageFileId}` : '/brand/mother-og.jpg',
@@ -141,22 +141,22 @@ export const metadataForRoute = async (route) => {
       'upload-format': `Upload ${String(route.format || 'post').replaceAll('-', ' ')}`
     };
     return {
-      title: `${privateTitles[route.page] || 'Private page'} — Social Media Mother`,
+      title: `${privateTitles[route.page] || 'Private page'} | SocialMediaMother`,
       description: 'A private account action on Social Media Mother.',
       url: `${canonicalOrigin}${route.path}`,
       image: '/brand/mother-og.jpg',
-      imageAlt: 'Social Media Mother heart gesture',
+      imageAlt: 'SocialMediaMother creators hugging',
       type: 'website',
       robots: 'noindex, nofollow, noarchive'
     };
   }
 
   return {
-    title: 'Page not found — Social Media Mother',
+    title: 'Page not found | SocialMediaMother',
     description: 'This Social Media Mother page could not be found.',
     url: `${canonicalOrigin}${route.path || '/'}`,
     image: '/brand/mother-og.jpg',
-    imageAlt: 'Social Media Mother heart gesture',
+    imageAlt: 'SocialMediaMother creators hugging',
     type: 'website',
     robots: 'noindex, nofollow, noarchive'
   };

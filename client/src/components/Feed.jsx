@@ -1,21 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, Info, Link2, MessageCircle, Pencil, Play, Send, Square, Trash2, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronLeft, ChevronRight, Facebook, Github, Globe2, Info, Instagram, Linkedin, MessageCircle, Pencil, Play, Send, Square, Trash2, X, Youtube } from 'lucide-react';
 import { api } from '../lib/api';
 import { trackAnalytics } from '../lib/analytics';
 import { useInView, useReducedMotion } from '../lib/hooks';
-import { postPath } from '../lib/routes';
+import { describeExternalLinks } from '../lib/platformLinks';
 import { HugIcon, OceanWave, PersonSilhouette, ThrowIcon } from './IconArt';
 
 export function Avatar({ person, size = 'medium' }) {
   const [avatarFailed, setAvatarFailed] = useState(false);
-  const [avatarLoaded, setAvatarLoaded] = useState(false);
   useEffect(() => {
     setAvatarFailed(false);
-    setAvatarLoaded(false);
   }, [person?.avatar]);
   const initials = person?.name?.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'M';
   if (person?.avatar && !avatarFailed) {
-    return <img className={`avatar avatar-${size} ${avatarLoaded ? 'asset-ready' : 'asset-loading'}`} src={person.avatar} alt="" loading="lazy" onLoad={() => setAvatarLoaded(true)} onError={() => setAvatarFailed(true)} />;
+    return <img className={`avatar avatar-${size}`} src={person.avatar} alt="" loading={size === 'small' ? 'lazy' : 'eager'} decoding="async" onError={() => setAvatarFailed(true)} />;
   }
   return (
     <span className={`avatar avatar-${size} avatar-fallback`} aria-hidden="true">
@@ -53,29 +52,43 @@ function HumanRopeIcon({ expanded }) {
   );
 }
 
-function TreasureIcon({ open }) {
+function FilesFolderIcon({ open }) {
   return (
-    <svg className={`treasure-icon ${open ? 'open' : ''}`} viewBox="0 0 42 35" aria-hidden="true">
-      <path className="treasure-lid" d="M5 15V11C5 6 10 3 21 3s16 3 16 8v4H5Z" />
-      <path className="treasure-box" d="M4 15h34v16H4z" />
-      <path className="treasure-bands" d="M11 5v26m20-26v26M4 21h34" />
-      <circle className="treasure-lock" cx="21" cy="22" r="3" />
+    <svg className={`files-folder-icon ${open ? 'open' : ''}`} viewBox="0 0 46 38" aria-hidden="true">
+      <path className="folder-paper paper-back" d="M15 4h22v24H15z" />
+      <path className="folder-paper paper-middle" d="M10 7h24v23H10z" />
+      <path className="folder-tab" d="M3 12V8h15l4 4h21v21H3Z" />
+      <path className="folder-front" d="M3 16h40l-4 18H7Z" />
+      <path className="folder-lines" d="M15 11h13m-13 5h17" />
     </svg>
   );
 }
 
-function MercedesZoomIcon() {
+function MercedesZoomIcon({ pan }) {
   return (
     <svg className="mercedes-zoom-icon" viewBox="0 0 58 42" aria-hidden="true">
       <circle className="zoom-sun" cx="46" cy="9" r="6" />
       <path className="zoom-sea" d="M2 17c8-4 14 4 22 0s14 4 22 0 8 0 10 0v8H2Z" />
       <path className="zoom-road" d="m18 20 20 0 15 20H5Z" />
       <path className="zoom-lane" d="m28 23 1 5m1 3 2 7" />
-      <path className="zoom-car" d="M16 30h25l4 4v4H12v-4l4-4Zm5 0 3-5h11l4 5" />
-      <circle className="zoom-wheel" cx="18" cy="38" r="3" /><circle className="zoom-wheel" cx="39" cy="38" r="3" />
-      <circle className="zoom-star" cx="29" cy="34" r="2.5" /><path className="zoom-star" d="M29 31.5v5M26.8 35.3l4.4-2.6m0 2.6-4.4-2.6" />
+      <g className="zoom-car-group" style={{ transform: `translate(${pan.x * 0.18}px, ${pan.y * 0.12}px)` }}>
+        <path className="zoom-car" d="M16 30h25l4 4v4H12v-4l4-4Zm5 0 3-5h11l4 5" />
+        <circle className="zoom-wheel" cx="18" cy="38" r="3" /><circle className="zoom-wheel" cx="39" cy="38" r="3" />
+        <circle className="zoom-star" cx="29" cy="34" r="2.5" /><path className="zoom-star" d="M29 31.5v5M26.8 35.3l4.4-2.6m0 2.6-4.4-2.6" />
+      </g>
     </svg>
   );
+}
+
+function PlatformIcon({ platform, size = 18 }) {
+  if (platform === 'youtube') return <Youtube size={size} fill="currentColor" />;
+  if (platform === 'instagram') return <Instagram size={size} />;
+  if (platform === 'facebook') return <Facebook size={size} fill="currentColor" />;
+  if (platform === 'linkedin') return <Linkedin size={size} fill="currentColor" />;
+  if (platform === 'github') return <Github size={size} fill="currentColor" />;
+  if (platform === 'tiktok') return <svg className="platform-custom-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v11.2a4.3 4.3 0 1 1-3.4-4.2v3a1.5 1.5 0 1 0 .4 1V3h3c.5 2 1.8 3.3 4 3.8v3a8 8 0 0 1-4-1.7V3Z" /></svg>;
+  if (platform === 'x') return <svg className="platform-custom-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h4.6l4.2 5.6L17.7 4H20l-6.2 7.2L20 20h-4.6l-4.6-6.1L5.5 20H3.2l6.6-7.7L4 4Zm3.4 2 9 12h1.7l-9-12H7.4Z" /></svg>;
+  return <Globe2 size={size} />;
 }
 
 function formatMediaTime(value) {
@@ -96,7 +109,7 @@ function AssetError({ message, onRetry }) {
   );
 }
 
-function ImageSlide({ item, index, preview, priority, zoom }) {
+function ImageSlide({ item, index, preview, priority, zoom, pan }) {
   const [status, setStatus] = useState('loading');
   const [retryKey, setRetryKey] = useState(0);
   return (
@@ -109,7 +122,7 @@ function ImageSlide({ item, index, preview, priority, zoom }) {
         fetchPriority={(preview || priority) && index === 0 ? 'high' : 'auto'}
         onLoad={() => setStatus('ready')}
         onError={() => setStatus('error')}
-        style={{ transform: `scale(${zoom})` }}
+        style={{ transform: `translate(${pan.x}%, ${pan.y}%) scale(${zoom})` }}
       />
       {status === 'loading' && <span className="media-loading-message">Loading photo…</span>}
       {status === 'error' && <AssetError message="This photo could not be loaded." onRetry={() => { setStatus('loading'); setRetryKey((value) => value + 1); }} />}
@@ -117,10 +130,9 @@ function ImageSlide({ item, index, preview, priority, zoom }) {
   );
 }
 
-function VideoSlide({ item, active, inView, controlsVisible, analyticsContext }) {
+function VideoSlide({ item, active, inView, controlsVisible, analyticsContext, muted }) {
   const videoRef = useRef(null);
   const [paused, setPaused] = useState(false);
-  const [muted, setMuted] = useState(true);
   const [status, setStatus] = useState('loading');
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -133,6 +145,17 @@ function VideoSlide({ item, active, inView, controlsVisible, analyticsContext })
     if (active && inView && !paused) video.play().catch(() => {});
     else video.pause();
   }, [active, inView, muted, paused]);
+
+  const seekAndPlay = (value) => {
+    const next = Math.min(Math.max(0, Number(value) || 0), duration || 0);
+    const video = videoRef.current;
+    if (video) {
+      video.currentTime = next;
+      video.play().catch(() => {});
+    }
+    setCurrentTime(next);
+    setPaused(false);
+  };
 
   useEffect(() => {
     if (!active || !inView || paused || status !== 'ready' || !analyticsContext?.postId) return undefined;
@@ -179,25 +202,22 @@ function VideoSlide({ item, active, inView, controlsVisible, analyticsContext })
             value={Math.min(currentTime, Math.max(duration, 0.1))}
             aria-label="Choose the video time"
             style={{ '--watched': `${duration ? (currentTime / duration) * 100 : 0}%` }}
-            onChange={(event) => {
-              const next = Number(event.target.value);
-              if (videoRef.current) videoRef.current.currentTime = next;
-              setCurrentTime(next);
-            }}
+            onPointerDown={(event) => { event.currentTarget.setPointerCapture?.(event.pointerId); seekAndPlay(event.currentTarget.value); }}
+            onInput={(event) => seekAndPlay(event.currentTarget.value)}
+            onChange={(event) => seekAndPlay(event.currentTarget.value)}
           />
           <div className="manual-time-jump">
-            <span>Go exactly to</span>
-            {['hours', 'minutes', 'seconds'].map((unit) => <label key={unit}><input type="number" min="0" max={unit === 'hours' ? 999 : 59} inputMode="numeric" value={manual[unit]} onChange={(event) => setManual((value) => ({ ...value, [unit]: event.target.value.replace(/\D/g, '').slice(0, 3) }))} /><small>{unit[0]}</small></label>)}
+            {['hours', 'minutes', 'seconds'].map((unit, unitIndex) => <span className="manual-time-unit" key={unit}>
+              {unitIndex > 0 && <b className="time-colon" aria-hidden="true">:</b>}
+              <label><input aria-label={`Enter ${unit}`} placeholder="00" type="number" min="0" max={unit === 'hours' ? 999 : 59} inputMode="numeric" value={manual[unit]} onChange={(event) => setManual((value) => ({ ...value, [unit]: event.target.value.replace(/\D/g, '').slice(0, 3) }))} /><small>{unit}</small></label>
+            </span>)}
             <button type="button" onClick={() => {
               const requested = Number(manual.hours || 0) * 3600 + Number(manual.minutes || 0) * 60 + Number(manual.seconds || 0);
-              const next = Math.min(Math.max(0, requested), duration || 0);
-              if (videoRef.current) videoRef.current.currentTime = next;
-              setCurrentTime(next);
-            }}>Go</button>
+              seekAndPlay(requested);
+            }}>Add time to go there</button>
           </div>
         </div>
       )}
-      {controlsVisible && status !== 'error' && <button type="button" className={`media-sound ${muted ? 'muted' : 'sound-on'}`} onClick={(event) => { event.stopPropagation(); setMuted((value) => !value); }} aria-label={muted ? 'Turn sound on' : 'Mute video'} title={muted ? 'Turn sound on' : 'Mute video'}><DrumSoundIcon soundOn={!muted} /><span>{muted ? 'Sound off' : 'Sound on'}</span></button>}
     </div>
   );
 }
@@ -209,6 +229,8 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
   const [toolboxOpen, setToolboxOpen] = useState(false);
   const [carouselPaused, setCarouselPaused] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [muted, setMuted] = useState(true);
   const [containerRef, inView] = useInView();
   const reducedMotion = useReducedMotion();
   const touchStart = useRef(null);
@@ -241,7 +263,24 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
 
   useEffect(() => {
     setZoom(1);
+    setPan({ x: 0, y: 0 });
   }, [index]);
+
+  const zoomLimit = (value = zoom) => Math.max(0, ((value - 1) / value) * 48);
+  const changeZoom = (nextZoom) => {
+    const next = Number(nextZoom);
+    const limit = zoomLimit(next);
+    setZoom(next);
+    setPan((value) => ({
+      x: Math.min(limit, Math.max(-limit, value.x)),
+      y: Math.min(limit, Math.max(-limit, value.y)),
+    }));
+  };
+  const movePhoto = (axis, amount) => {
+    const limit = zoomLimit();
+    if (!limit) return;
+    setPan((value) => ({ ...value, [axis]: Math.min(limit, Math.max(-limit, value[axis] + amount)) }));
+  };
 
   const toggleFullscreen = async () => {
     const node = containerRef.current;
@@ -284,9 +323,9 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
     >
       <div className="media-stage">
         {current.type === 'video' ? (
-          <VideoSlide item={current} active inView={inView || preview} controlsVisible={controlsVisible} analyticsContext={preview ? null : { postId, postAuthorId, targetType: 'post', targetId: postId, format: postFormat }} />
+          <VideoSlide item={current} active inView={inView || preview} controlsVisible={controlsVisible} muted={muted} analyticsContext={preview ? null : { postId, postAuthorId, targetType: 'post', targetId: postId, format: postFormat }} />
         ) : (
-          <ImageSlide item={current} index={index} preview={preview} priority={priority} zoom={zoom} />
+          <ImageSlide item={current} index={index} preview={preview} priority={priority} zoom={zoom} pan={pan} />
         )}
         {media.length > 1 && (
           <>
@@ -299,12 +338,27 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
           </>
         )}
         {!preview && controlsVisible && current.type !== 'video' && media.length > 1 && <button type="button" className="media-play carousel-play" onClick={(event) => { event.stopPropagation(); setCarouselPaused((value) => !value); }} aria-label={carouselPaused ? 'Continue photo carousel' : 'Stop photo carousel'}>{carouselPaused ? <Play size={22} fill="currentColor" /> : <Square size={20} fill="currentColor" />}</button>}
-        {!preview && controlsVisible && <button type="button" className={`media-toolbox-trigger ${toolboxOpen ? 'active' : ''}`} onClick={(event) => { event.stopPropagation(); setToolboxOpen((value) => !value); }} aria-expanded={toolboxOpen} aria-label="Many things: full screen and zoom"><TreasureIcon open={toolboxOpen} /><span>Many things</span></button>}
+        {!preview && controlsVisible && <button type="button" className={`media-toolbox-trigger ${toolboxOpen ? 'active' : ''}`} onClick={(event) => { event.stopPropagation(); setToolboxOpen((value) => !value); }} aria-expanded={toolboxOpen} aria-label="More options"><FilesFolderIcon open={toolboxOpen} /><span>More options</span></button>}
         {!preview && controlsVisible && toolboxOpen && (
           <div className="media-toolbox" onClick={(event) => event.stopPropagation()}>
-            <header><strong>Many things</strong><button type="button" onClick={() => setToolboxOpen(false)} aria-label="Close many things"><X size={18} /></button></header>
+            <header><strong>More options</strong><button type="button" onClick={() => setToolboxOpen(false)} aria-label="Close more options"><X size={18} /></button></header>
             <button type="button" className={`media-fullscreen ${fullscreen ? 'active' : ''}`} onClick={toggleFullscreen} aria-label={fullscreen ? 'Exit full screen' : 'View media full screen'}><HumanRopeIcon expanded={fullscreen} /><span>{fullscreen ? 'Exit full screen' : 'Full screen'}</span></button>
-            <label className="media-zoom-control"><MercedesZoomIcon /><span>Photo zoom <b>{Math.round(zoom * 100)}%</b></span><input type="range" min="1" max="3" step="0.05" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} aria-label="Zoom photo in or out" /></label>
+            {current.type === 'video' ? (
+              <button type="button" className={`media-sound ${muted ? 'muted' : 'sound-on'}`} onClick={() => setMuted((value) => !value)} aria-label={muted ? 'Turn sound on' : 'Mute video'} title={muted ? 'Turn sound on' : 'Mute video'}><DrumSoundIcon soundOn={!muted} /><span>{muted ? 'Sound off' : 'Sound on'}</span></button>
+            ) : (
+              <div className="media-zoom-control">
+                <MercedesZoomIcon pan={pan} />
+                <span>Photo zoom <b>{Math.round(zoom * 100)}%</b></span>
+                <input type="range" min="1" max="3" step="0.05" value={zoom} onChange={(event) => changeZoom(event.target.value)} aria-label="Zoom photo in or out" />
+                <div className={`photo-pan-pad ${zoom === 1 ? 'disabled' : ''}`} aria-label="Move around the zoomed photo">
+                  <button type="button" className="pan-up" onClick={() => movePhoto('y', 6)} disabled={zoom === 1} aria-label="Move photo down to see higher"><ArrowUp size={18} /></button>
+                  <button type="button" className="pan-left" onClick={() => movePhoto('x', 6)} disabled={zoom === 1} aria-label="Move photo right to see the left side"><ArrowLeft size={18} /></button>
+                  <button type="button" className="pan-reset" onClick={() => setPan({ x: 0, y: 0 })} disabled={zoom === 1} aria-label="Center the zoomed photo"><span /></button>
+                  <button type="button" className="pan-right" onClick={() => movePhoto('x', -6)} disabled={zoom === 1} aria-label="Move photo left to see the right side"><ArrowRight size={18} /></button>
+                  <button type="button" className="pan-down" onClick={() => movePhoto('y', -6)} disabled={zoom === 1} aria-label="Move photo up to see lower"><ArrowDown size={18} /></button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -314,7 +368,7 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
           <div className="page-track">
             <span
               key={`${index}-${inView}`}
-              className={inView && !reducedMotion && !preview ? 'running' : ''}
+              className={inView && !reducedMotion && !preview ? `running ${carouselPaused ? 'paused' : ''}` : ''}
               style={{ width: preview ? `${((index + 1) / media.length) * 100}%` : undefined }}
             />
           </div>
@@ -547,10 +601,12 @@ function CommentPanel({ post, viewer, onRequireAuth, onClose, onCountChange }) {
   );
 }
 
-export function FeedCard({ post, onPerson, onPost, onDelete, viewer, onRequireAuth, priority = false }) {
+export function FeedCard({ post, onPerson, onDelete, viewer, onRequireAuth, priority = false }) {
   const isText = post.type === 'text';
   const own = Boolean(viewer && (String(post.author?.id || '') === String(viewer.id || '') || post.author?.username === viewer.username));
+  const externalLinks = describeExternalLinks(post.links?.length ? post.links : post.link ? [post.link] : []);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [externalPlacesOpen, setExternalPlacesOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentCount, setCommentCount] = useState(Number(post.comments || 0));
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -608,24 +664,10 @@ export function FeedCard({ post, onPerson, onPost, onDelete, viewer, onRequireAu
       {!isText && detailsOpen && <div className="post-copy post-details-copy">
         {!isText && <h2>{post.name}</h2>}
         {post.detail && <p>{post.detail}</p>}
-        {post.id && (
-          <a
-            className="post-permalink"
-            href={postPath(post.id)}
-            onClick={(event) => {
-              if (!onPost || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-              event.preventDefault();
-              onPost(post);
-            }}
-          >
-            Open this post <Link2 size={14} />
-          </a>
-        )}
-        {(post.links?.length ? post.links : post.link ? [post.link] : []).map((link, index) => (
-          <a href={link} target="_blank" rel="noreferrer" key={`${link}-${index}`}>
-            Visit {index ? 'another' : 'their'} other place <ExternalLink size={14} />
-          </a>
-        ))}
+        {externalLinks.length > 0 && <button type="button" className="external-places-trigger" onClick={() => setExternalPlacesOpen(true)}>
+          <span className="external-platform-notices" aria-hidden="true">{externalLinks.slice(0, 4).map((link, index) => <i className={`platform-badge platform-${link.id}`} key={`${link.url}-${index}`}><PlatformIcon platform={link.id} size={13} /></i>)}</span>
+          <span>Visit their other places</span>
+        </button>}
       </div>}
       <div className={`post-action-row ${isText ? 'text-actions' : ''}`}>
         <ReactionBar post={post} viewer={viewer} onRequireAuth={onRequireAuth} />
@@ -633,6 +675,14 @@ export function FeedCard({ post, onPerson, onPost, onDelete, viewer, onRequireAu
         {!isText && <button type="button" className={`details-button ${detailsOpen ? 'active' : ''}`} onClick={() => setDetailsOpen((value) => !value)}><Info size={18} /> <span>Full details of it</span></button>}
       </div>
       {commentsOpen && <CommentPanel post={post} viewer={viewer} onRequireAuth={onRequireAuth} onClose={() => setCommentsOpen(false)} onCountChange={setCommentCount} />}
+      {externalPlacesOpen && createPortal(
+        <div className="external-places-layer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setExternalPlacesOpen(false); }}>
+          <section className="external-places-card" role="dialog" aria-modal="true" aria-labelledby={`external-places-${post.id}`}>
+            <header><div><strong id={`external-places-${post.id}`}>All platform links</strong><small>Choose the place you want to open.</small></div><button type="button" onClick={() => setExternalPlacesOpen(false)} aria-label="Close all platform links"><X size={20} /></button></header>
+            <div className="external-place-list">{externalLinks.map((link, index) => <a className={`external-place platform-${link.id}`} href={link.url} target="_blank" rel="noreferrer noopener" key={`${link.url}-${index}`}><span><PlatformIcon platform={link.id} size={22} /></span><strong>{link.label}</strong><small>Open</small></a>)}</div>
+          </section>
+        </div>, document.body
+      )}
     </article>
   );
 }

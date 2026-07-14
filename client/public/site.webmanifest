@@ -1,6 +1,6 @@
 {
-  "name": "Social Media Mother",
-  "short_name": "Mother",
+  "name": "SocialMediaMother",
+  "short_name": "SocialMediaMother",
   "description": "A free place to share thoughts, photos and motion.",
   "start_url": "/",
   "display": "standalone",

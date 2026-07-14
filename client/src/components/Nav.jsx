@@ -1,4 +1,5 @@
-import { Search, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 
 function FeedSwitch({ feedMode, onFeedMode }) {
   return (
@@ -13,12 +14,32 @@ function FeedSwitch({ feedMode, onFeedMode }) {
   );
 }
 
-export default function Nav({ query, onQuery, feedMode, onFeedMode, user, onHome, onCreate, onLogin, onLogout }) {
+function HuggingBrandPicture({ size = 44 }) {
   return (
-    <header className="top-shell">
+    <span className="brand-hug-picture" style={{ '--brand-picture-size': `${size}px` }}>
+      <img src="/icon-192.png" alt="" width={size} height={size} />
+      <i className="love-particle love-one">♥</i><i className="love-particle love-two">♥</i><i className="love-particle love-three">♥</i>
+    </span>
+  );
+}
+
+export default function Nav({ query, onQuery, feedMode, onFeedMode, user, onHome, onCreate, onLogin, onLogout }) {
+  const [hidden, setHidden] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.toggle('top-navigation-hidden', hidden);
+    return () => document.body.classList.remove('top-navigation-hidden');
+  }, [hidden]);
+
+  return (
+    <header className={`top-shell ${hidden ? 'navigation-hidden' : ''}`}>
+      <button type="button" className="top-navigation-toggle" onClick={() => setHidden((value) => !value)} aria-expanded={!hidden} aria-label={hidden ? 'See navigation' : 'Hide navigation'} title={hidden ? 'See' : 'Hide'}>
+        {hidden ? <ChevronDown size={25} /> : <ChevronUp size={25} />}
+        <span className="control-tooltip">{hidden ? 'See' : 'Hide'}</span>
+      </button>
       <nav className="top-nav" aria-label="Main navigation">
         <a href="/" className="brand-link" aria-label="Social Media Mother home" onClick={(event) => { event.preventDefault(); onHome?.(); }}>
-          <img src="/icon-192.png" alt="" width="44" height="44" />
+          <HuggingBrandPicture />
           <span className="brand-word">Social Media Mother</span>
         </a>
 

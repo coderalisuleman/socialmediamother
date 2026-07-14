@@ -26,7 +26,10 @@ export default function SiteFooter() {
   return (
     <footer className="site-footer">
       <a href="/" className="footer-identity" aria-label="Social Media Mother home">
-        <img src="/icon-192.png" alt="Social Media Mother" width="64" height="64" loading="lazy" />
+        <span className="brand-hug-picture footer-hug-picture" style={{ '--brand-picture-size': '64px' }}>
+          <img src="/icon-192.png" alt="Social Media Mother" width="64" height="64" loading="lazy" />
+          <i className="love-particle love-one">♥</i><i className="love-particle love-two">♥</i><i className="love-particle love-three">♥</i>
+        </span>
         <span>Social Media Mother</span>
       </a>
       <MissionNote compact />

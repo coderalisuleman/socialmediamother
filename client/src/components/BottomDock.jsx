@@ -1,4 +1,5 @@
-import { Plus, UserRound } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronDown, ChevronUp, Plus, UserRound } from 'lucide-react';
 
 function ChangeShirtIcon() {
   return (
@@ -11,11 +12,18 @@ function ChangeShirtIcon() {
 }
 
 export default function BottomDock({ onUpload, onChange, onMe }) {
+  const [hidden, setHidden] = useState(false);
   return (
-    <nav className="bottom-dock" aria-label="Post and profile actions">
-      <button type="button" onClick={onChange}><ChangeShirtIcon /><span>Change</span></button>
-      <button type="button" className="dock-upload" onClick={onUpload}><Plus size={24} /><span>Upload</span></button>
-      <button type="button" onClick={onMe}><UserRound size={19} /><span>Me</span></button>
-    </nav>
+    <div className={`bottom-dock-shell ${hidden ? 'dock-hidden' : ''}`}>
+      <nav className="bottom-dock" aria-label="Post and profile actions">
+        <button type="button" onClick={onChange}><ChangeShirtIcon /><span>Change</span></button>
+        <button type="button" className="dock-upload" onClick={onUpload}><Plus size={24} /><span>Upload</span></button>
+        <button type="button" onClick={onMe}><UserRound size={19} /><span>Me</span></button>
+      </nav>
+      <button type="button" className="bottom-dock-toggle" onClick={() => setHidden((value) => !value)} aria-expanded={!hidden} aria-label={hidden ? 'See bottom actions' : 'Hide bottom actions'} title={hidden ? 'See' : 'Hide'}>
+        {hidden ? <ChevronUp size={25} /> : <ChevronDown size={25} />}
+        <span className="control-tooltip">{hidden ? 'See' : 'Hide'}</span>
+      </button>
+    </div>
   );
 }

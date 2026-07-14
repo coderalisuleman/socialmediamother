@@ -2,8 +2,11 @@ export function BrandMark({ small = false }) {
   return (
     <svg className={small ? 'brand-mark small' : 'brand-mark'} viewBox="0 0 64 64" role="img" aria-label="Mother">
       <rect x="2" y="2" width="60" height="60" rx="20" fill="currentColor" />
-      <path d="M13 35c0-11 7-18 17-18 6 0 10 3 12 7 2-4 5-6 9-6v27c0 4-3 7-7 7H28c-9 0-15-7-15-17Z" fill="var(--ivory)" />
-      <path d="M21 29c0-4 3-7 7-7 3 0 6 2 8 6 2-4 5-6 8-6 4 0 7 3 7 7 0 7-9 13-15 17-6-4-15-10-15-17Z" fill="var(--pink)" />
+      <circle cx="25" cy="23" r="7" fill="#d89d76" />
+      <circle cx="39" cy="23" r="7" fill="#b97957" />
+      <path d="M15 52V39c0-8 4-12 10-12 3 0 5 1 7 4 2-3 4-4 7-4 6 0 10 4 10 12v13H15Z" fill="var(--ivory)" />
+      <path d="M14 34c7 1 10 5 14 12m22-12c-7 1-10 5-14 12" fill="none" stroke="var(--pink)" strokeWidth="5" strokeLinecap="round" />
+      <path d="M32 14c-3-4-8 1 0 7 8-6 3-11 0-7Z" fill="var(--pink)" className="brand-love-pulse" />
     </svg>
   );
 }

@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Sparkles, UserPlus } from 'lucide-react';
 import { api } from '../lib/api';
 import { useDebouncedValue } from '../lib/hooks';
 import { Avatar, FeedCard, FeedSkeleton, LoadMore } from './Feed';
 
-const filters = ['all', 'text', 'photo', 'video', 'short-video'];
-const contentTypeLabels = { all: 'All', text: 'Text', photo: 'Photo', video: 'Video', 'short-video': 'Short video' };
+const filters = ['all', 'people', 'text', 'photo', 'video', 'short-video'];
+const contentTypeLabels = { all: 'All', people: 'People', text: 'Text', photo: 'Photo', video: 'Video', 'short-video': 'Short video' };
 
 function normalize(value) {
   return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -65,19 +64,18 @@ function localResults(query, people, posts) {
   return { people: rankedPeople, posts: rankedPosts };
 }
 
-export default function SearchPanel({ query, people, posts, onFollow, onPerson, onPost, onDeletePost, viewer, onRequireAuth }) {
+export default function SearchPanel({ query, people, posts, onPerson, onDeletePost, viewer, onRequireAuth }) {
   const debounced = useDebouncedValue(query, 260);
   const [filter, setFilter] = useState('all');
   const [remote, setRemote] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [usedLocal, setUsedLocal] = useState(false);
 
   useEffect(() => {
     if (!debounced.trim()) return;
     let active = true;
     setLoading(true);
-    api.search({ q: debounced, type: filter, limit: 30 })
+    api.search({ q: debounced, type: filter === 'people' ? 'all' : filter, limit: 30 })
       .then((payload) => {
         if (!active) return;
         setRemote({
@@ -85,12 +83,9 @@ export default function SearchPanel({ query, people, posts, onFollow, onPerson, 
           posts: payload?.posts || payload?.items || [],
           nextCursor: payload?.nextCursor || null,
         });
-        setUsedLocal(false);
       })
       .catch(() => {
-        if (!active) return;
-        setRemote(null);
-        setUsedLocal(true);
+        if (active) setRemote(null);
       })
       .finally(() => active && setLoading(false));
     return () => { active = false; };
@@ -99,25 +94,13 @@ export default function SearchPanel({ query, people, posts, onFollow, onPerson, 
   const results = useMemo(() => {
     const value = remote || localResults(debounced, people, posts);
     return {
-      people: value.people || [],
-      posts: (value.posts || []).filter((post) => filter === 'all' || post.type === filter),
+      people: ['all', 'people'].includes(filter) ? (value.people || []) : [],
+      posts: filter === 'people' ? [] : (value.posts || []).filter((post) => filter === 'all' || post.type === filter),
     };
   }, [debounced, filter, people, posts, remote]);
 
-  const followFromSearch = async (person) => {
-    const confirmed = await onFollow(person);
-    if (!confirmed) return;
-    setRemote((current) => current ? {
-      ...current,
-      people: current.people.map((item) => item.username === confirmed.username ? confirmed : item),
-      posts: current.posts.map((post) => post.author?.username === confirmed.username
-        ? { ...post, author: confirmed }
-        : post),
-    } : current);
-  };
-
   const loadMoreResults = async () => {
-    if (!remote?.nextCursor || loadingMore) return;
+    if (!remote?.nextCursor || loadingMore || filter === 'people') return;
     setLoadingMore(true);
     try {
       const payload = await api.search({ q: debounced, type: filter, cursor: remote.nextCursor, limit: 30 });
@@ -133,14 +116,7 @@ export default function SearchPanel({ query, people, posts, onFollow, onPerson, 
 
   return (
     <main className="search-page" id="main-content">
-      <header className="search-heading">
-        <div>
-          <p className="eyebrow"><Sparkles size={14} /> Smart search</p>
-          <h1>Search</h1>
-        </div>
-        {usedLocal && <span className="preview-chip">Showing what is already here</span>}
-      </header>
-
+      <h1 className="sr-only">Search results</h1>
       <div className="search-filters" role="tablist" aria-label="Filter search results">
         {filters.map((item) => (
           <button key={item} type="button" role="tab" aria-selected={filter === item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)}>
@@ -148,43 +124,31 @@ export default function SearchPanel({ query, people, posts, onFollow, onPerson, 
           </button>
         ))}
       </div>
-      <div className="search-watching" aria-live="polite"><Search size={17} /><span>Watching <strong>{contentTypeLabels[filter]}</strong> for “{query.trim()}”</span><b>{results.posts.length} found</b></div>
 
       {loading && !remote ? <FeedSkeleton /> : (
         <>
+          {results.people.length === 0 && results.posts.length === 0 && <p className="search-empty-line" role="status">“{query.trim()}” is not uploaded here.</p>}
           {results.people.length > 0 && (
-            <section className="people-results" aria-labelledby="people-title">
-              <div className="section-title"><h2 id="people-title">People who match</h2><span>{results.people.length}</span></div>
+            <section className="people-results" aria-label="People">
               <div className="people-grid">
-                {results.people.slice(0, 6).map((person, index) => (
+                {results.people.slice(0, filter === 'people' ? 20 : 6).map((person) => (
                   <article className="person-result" key={person.id || person.username}>
-                    {index === 0 && <span className="best-match">Closest match</span>}
                     <button type="button" className="person-result-main" onClick={() => onPerson(person)}>
                       <Avatar person={person} size="large" />
-                      <span><strong>{person.name}</strong><small>@{person.username}</small><p>{person.bio}</p></span>
+                      <span><strong>{person.name}</strong><small>@{person.username}</small></span>
                     </button>
-                    {viewer?.username !== person.username && String(viewer?.id || '') !== String(person.id || '') && (
-                      <button type="button" className={`follow-mini ${person.isFollowing ? 'following' : ''}`} onClick={() => followFromSearch(person)}>
-                        {person.isFollowing ? 'With them' : <><UserPlus size={14} /> Be with</>}
-                      </button>
-                    )}
                   </article>
                 ))}
               </div>
             </section>
           )}
 
-          <section className="post-results" aria-labelledby="posts-title">
-            <div className="section-title"><h2 id="posts-title">What you are watching</h2><span>{results.posts.length}</span></div>
-            {results.posts.length > 0 ? (
-              <div className="feed-column search-feed">
-                {results.posts.map((post, index) => <FeedCard post={post} key={post.id} onFollow={followFromSearch} onPerson={onPerson} onPost={onPost} onDelete={onDeletePost} viewer={viewer} onRequireAuth={onRequireAuth} priority={index === 0} />)}
-                {remote?.nextCursor && <LoadMore loading={loadingMore} done={false} onClick={loadMoreResults} />}
-              </div>
-            ) : (
-              <div className="empty-state compact"><Search size={31} /><h2>No post carries those words yet.</h2><p>Try fewer words, a person’s name or their exact @username.</p></div>
-            )}
-          </section>
+          {results.posts.length > 0 && <section className="post-results" aria-label="Posts">
+            <div className="feed-column search-feed">
+              {results.posts.map((post, index) => <FeedCard post={post} key={post.id} onPerson={onPerson} onDelete={onDeletePost} viewer={viewer} onRequireAuth={onRequireAuth} priority={index === 0} />)}
+              {remote?.nextCursor && <LoadMore loading={loadingMore} done={false} onClick={loadMoreResults} />}
+            </div>
+          </section>}
         </>
       )}
     </main>

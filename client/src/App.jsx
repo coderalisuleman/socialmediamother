@@ -659,9 +659,11 @@ export default function App() {
       />
 
       {notice && (
-        <div className="notice-bar" role="status">
-          <Sparkles size={16} /> <span>{notice}</span>
-          <button type="button" className="notice-close" onClick={() => setNotice('')} aria-label="Dismiss message"><X size={16} /></button>
+        <div className="notice-layer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setNotice(''); }}>
+          <section className="notice-card" role="status" aria-live="polite">
+            <button type="button" className="notice-close" onClick={() => setNotice('')} aria-label="Close message"><X size={20} /></button>
+            <p>{notice}</p>
+          </section>
         </div>
       )}
 
@@ -705,13 +707,13 @@ export default function App() {
       ) : (
         <main className="home-layout" id="main-content">
           <section className="feed-section" aria-labelledby="feed-title">
-            <header className="feed-heading">
+            {focusedPost ? <header className="feed-heading">
               <div>
-                <p className="eyebrow"><Compass size={14} /> {focusedPost ? 'A shared post' : feedMode === 'everyone' ? 'The wide world' : 'Your chosen circle'}</p>
-                <h1 id="feed-title">{focusedPost ? focusedPost.name || `A ${focusedPost.type} post` : feedMode === 'everyone' ? 'Everyone’s every post' : 'The people I want to be with'}</h1>
-                <p>{focusedPost ? `Shared by @${focusedPost.author?.username}.` : followingFallback ? 'Until you choose your people, everyone keeps this space warm.' : feedMode === 'everyone' ? 'A changing mix, shaped by what you enjoy and what people are loving.' : 'Every format, only from the people you chose.'}</p>
+                <p className="eyebrow"><Compass size={14} /> Shared post</p>
+                <h1 id="feed-title">{focusedPost.name || `A ${focusedPost.type} post`}</h1>
+                <p>Shared by @{focusedPost.author?.username}.</p>
               </div>
-            </header>
+            </header> : <h1 id="feed-title" className="sr-only">{feedMode === 'everyone' ? 'Everyones Every Post' : 'The People To with I want To be There Posts'}</h1>}
 
             {loading && !focusedPost ? <FeedSkeleton /> : pageError && !focusedPost ? (
               <section className="page-load-error" role="alert"><strong>{pageError.title}</strong><p>{pageError.message}</p><small>If your internet is slow, wait a moment. If it is disconnected, reconnect first.</small><button type="button" className="primary-button" onClick={loadFeed}>Retry</button></section>

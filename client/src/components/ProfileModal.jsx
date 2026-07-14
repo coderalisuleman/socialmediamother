@@ -275,7 +275,7 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
         )}
       </section>
 
-      <section className="profile-posts" aria-labelledby="profile-posts-title">
+      {!editing && <section className="profile-posts" aria-labelledby="profile-posts-title">
         <h2 id="profile-posts-title" className="sr-only">{isOwn ? 'My posts' : `${person.name}'s posts`}</h2>
         <div className="profile-post-tabs" role="tablist" aria-label="Choose a post format">
           {postFilters.filter(([type]) => isOwn || !['drafts', 'fans'].includes(type)).map(([type, label]) => <button type="button" role="tab" aria-selected={postType === type} className={postType === type ? 'active' : ''} key={type} onClick={() => setPostType(type)}>{isOwn ? label : label.replace('My', `${person.name}'s`)}</button>)}
@@ -293,7 +293,7 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
         ) : profilePosts.length ? (
           <div className="feed-column">{profilePosts.map((post, index) => <FeedCard key={post.id} post={post} onPerson={onPerson} onPost={onPost} onDelete={async (item) => { await onDeletePost?.(item); setProfilePosts((current) => current.filter((candidate) => candidate.id !== item.id)); }} viewer={viewer} onRequireAuth={onRequireAuth} priority={index === 0} />)}</div>
         ) : <div className="profile-post-empty">No {postType.replace('-', ' ')} posts yet.</div>}
-      </section>
+      </section>}
     </main>
   );
 }

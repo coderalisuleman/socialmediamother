@@ -29,13 +29,13 @@ function countryOptions() {
   }).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function PasswordField({ label, value, onChange, autoComplete = 'new-password', required = true }) {
+export function PasswordField({ label, value, onChange, autoComplete = 'new-password', required = true, showLock = true, className = '' }) {
   const [shown, setShown] = useState(false);
   return (
-    <label className="password-field">
+    <label className={`password-field ${showLock ? '' : 'password-field-without-lock'} ${className}`.trim()}>
       <span>{label}</span>
       <div className="input-with-button">
-        <LockKeyhole size={17} />
+        {showLock && <LockKeyhole size={17} />}
         <input
           type={shown ? 'text' : 'password'}
           value={value}

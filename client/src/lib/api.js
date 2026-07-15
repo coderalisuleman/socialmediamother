@@ -280,7 +280,7 @@ export const api = {
     const payload = await request(`/users/${encodeURIComponent(username)}/posts${queryString({ type, limit: 50 })}`);
     return { ...payload, posts: (payload?.posts || []).map(normalizePostShape) };
   },
-  creatorAnalytics: () => request('/analytics/creator/report'),
+  creatorAnalytics: ({ days = 30, lifetime = false } = {}) => request(`/analytics/creator/report${queryString({ days: lifetime ? null : days, lifetime: lifetime ? 'true' : null })}`),
   analyticsTeamLogin: (email, password) => request('/analytics/team/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   analyticsTeamReport: (token, days = 7) => request(`/analytics/team/report${queryString({ days })}`, { headers: { Authorization: `Bearer ${token}` } }),
 };

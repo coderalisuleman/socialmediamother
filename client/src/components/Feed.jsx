@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronLeft, ChevronRight, Facebook, Github, Globe2, Image as ImageIcon, Info, Instagram, Linkedin, MessageCircle, Pencil, Play, Send, Smartphone, Square, Trash2, Video, X, Youtube } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronLeft, ChevronRight, Facebook, Github, Globe2, Image as ImageIcon, Info, Instagram, Linkedin, MessageCircle, Pencil, Play, Send, Smartphone, Square, Trash2, Video, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { trackAnalytics } from '../lib/analytics';
 import { useInView, useReducedMotion } from '../lib/hooks';
@@ -60,11 +60,30 @@ function FilesFolderIcon({ open }) {
 
 function TelescopeZoomIcon() {
   return (
-    <svg className="telescope-zoom-icon" viewBox="0 0 58 44" aria-hidden="true">
-      <defs><linearGradient id="scopeBody" x1="0" x2="1"><stop stopColor="#d9f3ff" /><stop offset=".45" stopColor="#315b6b" /><stop offset="1" stopColor="#172b33" /></linearGradient><linearGradient id="scopeLens"><stop stopColor="#fff" /><stop offset=".45" stopColor="#79d7f3" /><stop offset="1" stopColor="#18516b" /></linearGradient></defs>
-      <path className="scope-shadow" d="M8 35h43l-7 6H14Z" />
-      <g className="scope-body"><path d="m13 8 30 9-5 16-30-9Z" fill="url(#scopeBody)" /><ellipse cx="11" cy="16" rx="6" ry="10" transform="rotate(17 11 16)" fill="url(#scopeLens)" /><ellipse cx="42" cy="25" rx="4" ry="8" transform="rotate(17 42 25)" /></g>
-      <path className="scope-stand" d="m31 29-7 13m7-13 8 13m-8-13v13" />
+    <svg className="telescope-zoom-icon" viewBox="0 0 72 56" aria-hidden="true">
+      <defs><linearGradient id="scopeBody" x1="0" x2="1"><stop stopColor="#eefaff" /><stop offset=".2" stopColor="#79cce8" /><stop offset=".62" stopColor="#315b6b" /><stop offset="1" stopColor="#14252d" /></linearGradient><radialGradient id="scopeLens"><stop stopColor="#fff" /><stop offset=".35" stopColor="#8ce7ff" /><stop offset=".7" stopColor="#247694" /><stop offset="1" stopColor="#10242e" /></radialGradient></defs>
+      <ellipse className="scope-shadow" cx="38" cy="51" rx="27" ry="3" />
+      <g className="scope-body" transform="rotate(-17 35 22)">
+        <path className="scope-main-tube" d="M15 12h42v19H15Z" fill="url(#scopeBody)" />
+        <path className="scope-eyepiece" d="M5 17h12v9H5l-3-2v-5Z" />
+        <ellipse className="scope-lens-rim" cx="58" cy="21.5" rx="7" ry="11.5" />
+        <ellipse className="scope-lens" cx="59" cy="21.5" rx="4.8" ry="8.5" fill="url(#scopeLens)" />
+        <path className="scope-ring" d="M21 12v19m29-19v19" />
+        <path className="scope-focus-knob" d="M28 31v6h9v-6" />
+      </g>
+      <circle className="scope-star star-one" cx="62" cy="6" r="2" /><path className="scope-star star-two" d="m68 14 1 3 3 1-3 1-1 3-1-3-3-1 3-1Z" />
+      <path className="scope-stand" d="M35 34v7m0-2L18 53m17-14 17 14m-17-14v15" />
+    </svg>
+  );
+}
+
+function CameraFilmIcon() {
+  return (
+    <svg className="film-camera-icon" viewBox="0 0 58 50" aria-hidden="true">
+      <defs><linearGradient id="cameraBody" x1="0" x2="1"><stop stopColor="#6d452f" /><stop offset=".48" stopColor="#2f201a" /><stop offset="1" stopColor="#17110e" /></linearGradient></defs>
+      <circle cx="18" cy="13" r="9" /><circle cx="37" cy="12" r="8" /><circle cx="18" cy="13" r="3" /><circle cx="37" cy="12" r="2.7" />
+      <path d="M8 21h38v24H8Z" fill="url(#cameraBody)" /><rect x="13" y="26" width="18" height="13" rx="2" /><path d="m46 27 10-5v22l-10-5Z" />
+      <circle className="camera-film-wheel wheel-one" cx="18" cy="13" r="6" /><circle className="camera-film-wheel wheel-two" cx="37" cy="12" r="5" />
     </svg>
   );
 }
@@ -75,7 +94,7 @@ function MediaLoading({ kind }) {
 }
 
 function PlatformIcon({ platform, size = 18 }) {
-  if (platform === 'youtube') return <Youtube size={size} fill="currentColor" />;
+  if (platform === 'youtube') return <svg className="platform-custom-icon platform-youtube-mark" style={{ width: size, height: size }} viewBox="0 0 28 20" aria-hidden="true"><rect width="28" height="20" rx="5" /><path className="youtube-play" d="m11 5 9 5-9 5Z" /></svg>;
   if (platform === 'instagram') return <Instagram size={size} />;
   if (platform === 'facebook') return <Facebook size={size} fill="currentColor" />;
   if (platform === 'linkedin') return <Linkedin size={size} fill="currentColor" />;
@@ -90,7 +109,7 @@ function formatMediaTime(value) {
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
   const seconds = total % 60;
-  return `${hours ? `${hours}:` : ''}${String(minutes).padStart(hours ? 2 : 1, '0')}:${String(seconds).padStart(2, '0')}`;
+  return `${String(hours).padStart(2, '0')} : ${String(minutes).padStart(2, '0')} : ${String(seconds).padStart(2, '0')}`;
 }
 
 function AssetError({ message, onRetry }) {
@@ -185,11 +204,13 @@ function VideoSlide({ item, active, inView, controlsVisible, analyticsContext, m
       </button>}
       {controlsVisible && status !== 'error' && (
         <div className="video-time-controls" onClick={(event) => event.stopPropagation()}>
-          <div className="video-time-readout"><strong>{formatMediaTime(currentTime)}</strong><span>/</span><strong>{formatMediaTime(duration)}</strong></div>
-          <div className="magnetic-tape-timeline" style={{ '--tape-progress': `${duration ? (currentTime / duration) * 100 : 0}%`, '--tape-turn': `${duration ? (currentTime / duration) * 720 : 0}deg` }}>
-            <span className="tape-reel tape-source" aria-hidden="true"><i /><i /><i /></span>
-            <span className="tape-ribbon" aria-hidden="true"><i /></span>
-            <span className="tape-reel tape-takeup" aria-hidden="true"><i /><i /><i /></span>
+          <div className="video-time-readout"><strong>{formatMediaTime(currentTime)}</strong><span>of</span><strong>{formatMediaTime(duration)}</strong></div>
+          <div className={`camera-film-timeline ${paused ? 'is-paused' : ''}`} style={{ '--film-progress': `${duration ? (currentTime / duration) * 100 : 0}%` }}>
+            <span className="film-camera" aria-hidden="true"><CameraFilmIcon /></span>
+            <span className="film-strip" aria-hidden="true">
+              <i className="film-watched" />
+              {Array.from({ length: 9 }, (_, frame) => <b key={frame}><em /></b>)}
+            </span>
             <input
               className="video-seek"
               type="range"
@@ -197,7 +218,7 @@ function VideoSlide({ item, active, inView, controlsVisible, analyticsContext, m
               max={Math.max(duration, 0.1)}
               step="0.1"
               value={Math.min(currentTime, Math.max(duration, 0.1))}
-              aria-label="Drag the magnetic tape to choose the video time"
+              aria-label="Drag the camera film to choose the video time"
               onPointerDown={(event) => { event.currentTarget.setPointerCapture?.(event.pointerId); seekAndPlay(event.currentTarget.value); }}
               onInput={(event) => seekAndPlay(event.currentTarget.value)}
               onChange={(event) => seekAndPlay(event.currentTarget.value)}

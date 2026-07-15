@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpenText, Camera, Download, FileClock, ImagePlus, LoaderCircle, Play, Save, Trash2, UsersRound, X } from 'lucide-react';
+import { Camera, Download, FileClock, ImagePlus, LoaderCircle, Play, Save, Trash2, UsersRound, X } from 'lucide-react';
 import { api, normalizePostShape, normalizeUserShape } from '../lib/api';
 import { deletePostDraft, listPostDrafts } from '../lib/drafts';
+import { exportReport, safeFilePart } from '../lib/reportExport';
 import { Avatar, FeedCard } from './Feed';
 
 function exactCount(value) {
@@ -42,32 +43,87 @@ const postFilters = [
 
 function CreatorFansBehaviour() {
   const [report, setReport] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [periodUnit, setPeriodUnit] = useState('days');
+  const [periodAmount, setPeriodAmount] = useState('30');
+  const [format, setFormat] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    let active = true;
-    api.creatorAnalytics().then((payload) => active && setReport(payload)).catch((loadError) => active && setError(loadError.message || 'Fans-behaviour could not be gathered.')).finally(() => active && setLoading(false));
-    return () => { active = false; };
-  }, []);
+  const lifetime = periodUnit === 'lifetime';
+  const selectedDays = useMemo(() => {
+    if (lifetime) return null;
+    const maximum = periodUnit === 'months' ? 12 : 365;
+    const amount = Math.min(maximum, Math.max(1, Number.parseInt(periodAmount, 10) || 1));
+    return Math.min(365, periodUnit === 'months' ? amount * 30 : amount);
+  }, [lifetime, periodAmount, periodUnit]);
 
-  if (loading) return <div className="profile-post-loading"><LoaderCircle className="spin" /> Reading fans’ behaviour…</div>;
-  if (error) return <p className="form-error" role="alert">{error}</p>;
+  const collect = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      setReport(await api.creatorAnalytics({ days: selectedDays || 30, lifetime }));
+    } catch (loadError) {
+      setError(loadError.message || 'Fans-behaviour could not be gathered.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const totals = report?.totals || {};
   const metric = (label, value) => <article><strong>{Number(value || 0).toLocaleString('en-US').replaceAll(',', '')}</strong><span>{label}</span></article>;
-  const exportPdf = () => {
-    document.body.classList.add('printing-fans-behaviour');
-    const cleanup = () => document.body.classList.remove('printing-fans-behaviour');
-    window.addEventListener('afterprint', cleanup, { once: true });
-    window.print();
-    window.setTimeout(cleanup, 1500);
+  const reportLines = report ? [
+    'SocialMediaMother fans behaviour report',
+    `Period: ${lifetime ? 'From account creation to till now' : `Last ${selectedDays} days`}`,
+    `Post formats: ${totals.posts || 0}`,
+    `Viewers: ${totals.views || 0}`,
+    `Hugs: ${totals.hugs || 0}`,
+    `Throws: ${totals.throws || 0}`,
+    `Sent thoughts: ${totals.thoughts || 0}`,
+    `Watching seconds: ${totals.watchingSeconds || 0}`,
+    `People with you now: ${report.followers || 0}`,
+    '',
+    'Every post by itself',
+    ...(report.individual || []).flatMap((post) => [
+      `${post.name} (${post.type.replace('-', ' ')})`,
+      `Viewers ${post.views}; Hugs ${post.hugs}; Throws ${post.throws}; Thoughts ${post.thoughts}; Watch seconds ${post.watchingSeconds}; People gained ${post.followersGained}`,
+    ]),
+  ] : [];
+  const download = async () => {
+    if (!report || !format || downloading) return;
+    setDownloading(true);
+    setError('');
+    try {
+      await exportReport({
+        format,
+        fileName: safeFilePart(`SocialMediaMother-fans-behaviour-${lifetime ? 'lifetime' : `${selectedDays}-days`}`),
+        title: 'SocialMediaMother fans behaviour report',
+        lines: reportLines,
+        sheetName: 'Fans behaviour',
+      });
+    } catch (downloadError) {
+      setError(downloadError.message || 'This fans report could not be downloaded.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
     <div className="fans-report">
-      <header><div className="reading-report-art"><BookOpenText size={32} /><span>♥</span></div><div><h2>Fans-behaviour</h2><p>Collective and individual behaviour from the last {report?.periodDays || 90} days.</p></div><button type="button" className="draft-save-button" onClick={exportPdf}><Download size={16} /> Export this report as PDF</button></header>
-      <div className="fans-metrics">{metric('post formats', totals.posts)}{metric('viewers', totals.views)}{metric('hugs', totals.hugs)}{metric('throws', totals.throws)}{metric('sent thoughts', totals.thoughts)}{metric('watching seconds', totals.watchingSeconds)}{metric('people with you now', report?.followers)}</div>
-      <section className="individual-performance"><h3>Every post by itself</h3>{report?.individual?.length ? report.individual.map((post) => <article key={post.id}><div><strong>{post.name}</strong><small>{post.type.replace('-', ' ')} · {new Date(post.createdAt).toLocaleDateString()}</small></div><span><b>{post.views}</b> viewers</span><span><b>{post.hugs}</b> hugs</span><span><b>{post.throws}</b> throws</span><span><b>{post.thoughts}</b> thoughts</span><span><b>{post.watchingSeconds}</b> watch seconds</span><span><b>{post.followersGained}</b> people gained</span></article>) : <p>No published posts have behaviour to read yet.</p>}</section>
+      <section className="fans-period-controls" aria-label="Choose fans behaviour report time">
+        <label><span className="sr-only">Choose days, months, or lifetime</span><select value={periodUnit} onChange={(event) => { const value = event.target.value; setPeriodUnit(value); setPeriodAmount(value === 'months' ? '6' : '30'); }}><option value="days">Days</option><option value="months">Months</option><option value="lifetime">From account creation to till now</option></select></label>
+        {!lifetime && <label><span className="sr-only">Number of {periodUnit}</span><input type="number" min="1" max={periodUnit === 'months' ? 12 : 365} placeholder={periodUnit === 'months' ? '6' : '30'} value={periodAmount} onChange={(event) => setPeriodAmount(event.target.value.replace(/\D/g, '').slice(0, 3))} /></label>}
+        <button type="button" className="primary-button" onClick={collect} disabled={loading}>{loading ? <LoaderCircle className="spin" size={16} /> : null} Collect</button>
+      </section>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {report ? <>
+        <section className="analytics-notebook fans-notebook">
+          <svg className="analytics-pencil" viewBox="0 0 180 74" aria-hidden="true"><path className="pencil-line" d="M7 57c25-24 39 3 64-19s43 18 72-11" /><g className="drawing-pencil"><path d="m118 14 12-9 38 38-12 10Z" /><path d="m156 53 12-10 5 15Z" /></g></svg>
+          <div className="fans-metrics">{metric('post formats', totals.posts)}{metric('viewers', totals.views)}{metric('hugs', totals.hugs)}{metric('throws', totals.throws)}{metric('sent thoughts', totals.thoughts)}{metric('watching seconds', totals.watchingSeconds)}{metric('people with you now', report?.followers)}</div>
+          <section className="individual-performance"><h3>Every post by itself</h3>{report?.individual?.length ? report.individual.map((post) => <article key={post.id}><div><strong>{post.name}</strong><small>{post.type.replace('-', ' ')} · {new Date(post.createdAt).toLocaleDateString()}</small></div><span><b>{post.views}</b> viewers</span><span><b>{post.hugs}</b> hugs</span><span><b>{post.throws}</b> throws</span><span><b>{post.thoughts}</b> thoughts</span><span><b>{post.watchingSeconds}</b> watch seconds</span><span><b>{post.followersGained}</b> people gained</span></article>) : <p>No published posts have behaviour to read yet.</p>}</section>
+        </section>
+        <section className="analytics-download fans-download"><label><span className="sr-only">Select your format</span><select value={format} onChange={(event) => setFormat(event.target.value)}><option value="">Select your format</option><option value="image">Image</option><option value="pdf">PDF</option><option value="excel">Excel</option></select></label><button type="button" className="secondary-button" disabled={!format || downloading} onClick={download}>{downloading ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />} Download</button></section>
+      </> : !loading && <p className="fans-report-empty">Choose a time, then select Collect to draw your report.</p>}
     </div>
   );
 }
@@ -229,7 +285,7 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
       <section className="profile-page-card">
         <div className={`profile-sky ${editing ? 'editing-profile-sky' : ''}`}>
           {editing ? (
-            <div className="change-profile-picture-preview"><Avatar person={shownPerson} size="hero" /><strong>Change profile picture</strong></div>
+            <div className="change-profile-picture-preview"><Avatar person={shownPerson} size="hero" /></div>
           ) : (
             <>
               <div className="profile-orbit orbit-one" /><div className="profile-orbit orbit-two" />
@@ -247,15 +303,10 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
                     <RelationshipScene direction="following" active={!isOwn && person.isFollowing} />
                     <span><strong>{exactCount(person.following)}</strong><small>The people {isOwn ? 'I' : 'they'} want to be with</small></span>
                   </button>
-                  {!isOwn && <button type="button" className={`profile-follow-click ${person.isFollowing ? 'following' : ''}`} onClick={() => onFollow(person)} aria-pressed={Boolean(person.isFollowing)}>Click here</button>}
                 </div>
               </div>
+              {!isOwn && <button type="button" className={`profile-follow-click ${person.isFollowing ? 'following' : ''}`} onClick={() => onFollow(person)} aria-pressed={Boolean(person.isFollowing)}>Click me</button>}
               {person.bio && <p className="profile-bio">{person.bio}</p>}
-              {isOwn && <button type="button" className="secondary-button profile-change" onClick={() => {
-                const next = !editing;
-                if (!editing || !profileDirty) setEditing(next);
-                onEditingChange?.(next);
-              }}><Camera size={16} /> Change profile photo</button>}
             </>
           )}
         </div>
@@ -281,6 +332,7 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
               <label><span>Email address</span><input type="email" value={profileDetails.email} placeholder="you@example.com" onChange={(event) => setProfileDetails((current) => ({ ...current, email: event.target.value }))} /></label>
               <button type="button" className="primary-button" onClick={saveDetails} disabled={detailsSaving || !profileDetails.fullName || !profileDetails.username}>{detailsSaving ? <LoaderCircle className="spin" size={16} /> : <Save size={16} />} Save account details</button>
             </div>
+            <h2 className="change-profile-picture-heading">Change profile picture</h2>
             <div className="avatar-drop" onDragOver={(event) => event.preventDefault()} onDrop={(event) => {
               event.preventDefault();
               const next = [...event.dataTransfer.files].find((item) => item.type.startsWith('image/'));

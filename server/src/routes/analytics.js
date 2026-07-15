@@ -114,31 +114,44 @@ analyticsRouter.get('/team/report', requireAnalyticsTeam, asyncHandler(async (re
 analyticsRouter.get('/creator/report', requireAuth, asyncHandler(async (req, res) => {
   const posts = (await listPostsByAuthor(req.user.id, { limit: 500 })).slice(0, 500);
   const postIds = new Set(posts.map((post) => String(post.id)));
-  const sinceDate = new Date(Date.now() - 90 * 86_400_000);
+  const lifetime = req.query.lifetime === 'true';
+  const days = Math.min(365, Math.max(1, Number.parseInt(req.query.days || '30', 10) || 30));
+  const sinceDate = lifetime ? null : new Date(Date.now() - days * 86_400_000);
+  const eventFilter = { postAuthorId: String(req.user.id) };
+  if (sinceDate) eventFilter.occurredAt = { $gte: sinceDate };
   const events = config.storageMode === 'mongodb'
-    ? await AnalyticsEvent.find({ postAuthorId: String(req.user.id), occurredAt: { $gte: sinceDate } }).lean()
-    : memoryEvents.filter((event) => event.postAuthorId === String(req.user.id) && new Date(event.occurredAt) >= sinceDate);
+    ? await AnalyticsEvent.find(eventFilter).lean()
+    : memoryEvents.filter((event) => event.postAuthorId === String(req.user.id) && (!sinceDate || new Date(event.occurredAt) >= sinceDate));
+  const eventCountByPost = new Map();
   const watchByPost = new Map();
   const followsByPost = new Map();
   for (const event of events) {
     if (!postIds.has(String(event.postId))) continue;
+    const key = `${String(event.postId)}:${event.eventType}`;
+    eventCountByPost.set(key, (eventCountByPost.get(key) || 0) + 1);
     if (event.eventType === 'media_watch') watchByPost.set(String(event.postId), (watchByPost.get(String(event.postId)) || 0) + Number(event.durationMs || 0));
     if (event.eventType === 'creator_follow') followsByPost.set(String(event.postId), (followsByPost.get(String(event.postId)) || 0) + 1);
   }
+  const eventCount = (postId, type) => eventCountByPost.get(`${String(postId)}:${type}`) || 0;
   const individual = posts.map((post) => ({
     id: String(post.id),
     type: post.type,
     name: post.nameIt || post.text?.split('\n')[0]?.slice(0, 100) || `${post.type} post`,
-    views: Number(post.viewCount || 0),
-    hugs: Number(post.hugCount || 0),
-    throws: Number(post.throwCount || 0),
-    thoughts: Number(post.commentCount || 0),
+    views: lifetime ? Number(post.viewCount || 0) : eventCount(post.id, 'post_view'),
+    hugs: lifetime ? Number(post.hugCount || 0) : eventCount(post.id, 'post_hug'),
+    throws: lifetime ? Number(post.throwCount || 0) : eventCount(post.id, 'post_throw'),
+    thoughts: lifetime ? Number(post.commentCount || 0) : eventCount(post.id, 'post_thought'),
     watchingSeconds: Math.round((watchByPost.get(String(post.id)) || 0) / 1000),
     followersGained: followsByPost.get(String(post.id)) || 0,
     createdAt: post.createdAt,
   })).sort((a, b) => b.views + b.hugs * 2 + b.thoughts * 3 - (a.views + a.hugs * 2 + a.thoughts * 3));
   res.json({
-    periodDays: 90,
+    periodDays: lifetime ? null : days,
+    period: {
+      mode: lifetime ? 'lifetime' : 'days',
+      since: lifetime ? (req.user.createdAt || posts.at(-1)?.createdAt || null) : sinceDate.toISOString(),
+      until: new Date().toISOString(),
+    },
     totals: individual.reduce((total, post) => ({
       posts: total.posts + 1,
       views: total.views + post.views,

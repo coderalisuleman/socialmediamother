@@ -88,3 +88,6 @@ GridFS honors the MongoDB-only architecture and works well for an MVP, but video
 - `npm run check` — backend syntax checks and frontend production build
 
 Copyright © 2026 Vibe Coder Ali Suleman. All rights reserved.
+
+mabs further e:
+1. write algorthim for search engine 

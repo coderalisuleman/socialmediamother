@@ -5225,6 +5225,14 @@ body.top-navigation-hidden .right-rail { top: 24px; }
 
 @media (max-width: 760px) {
   .bottom-dock-toggle { bottom: max(83px, calc(env(safe-area-inset-bottom) + 70px)); }
+  html,
+  body,
+  #root,
+  .app-shell { max-width: 100%; overflow-x: clip; }
+  .nav-control-grid,
+  .feed-switch { min-width: 0; max-width: 100%; }
+  .feed-switch { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+  .feed-switch button { min-width: 0; min-height: 60px; overflow-wrap: anywhere; white-space: normal; }
   .media-carousel.orientation-portrait .media-stage { min-height: min(68vh,620px); }
   .media-carousel.orientation-landscape .media-stage { min-height: 220px; }
   .orientation-control { grid-template-columns: 1fr; }

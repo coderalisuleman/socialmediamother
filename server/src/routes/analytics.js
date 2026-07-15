@@ -103,7 +103,7 @@ const adminReportFromRows = (rows, since) => {
 };
 
 analyticsRouter.get('/team/report', requireAnalyticsTeam, asyncHandler(async (req, res) => {
-  const days = Math.min(90, Math.max(1, Number.parseInt(req.query.days || '7', 10) || 7));
+  const days = Math.min(365, Math.max(1, Number.parseInt(req.query.days || '30', 10) || 30));
   const sinceDate = new Date(Date.now() - days * 86_400_000);
   const rows = config.storageMode === 'mongodb'
     ? await AnalyticsEvent.find({ occurredAt: { $gte: sinceDate } }).sort({ occurredAt: 1 }).limit(100_000).lean()

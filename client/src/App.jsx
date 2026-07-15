@@ -640,6 +640,7 @@ export default function App() {
   const visiblePosts = focusedPost ? [focusedPost] : posts;
   const profileActive = ['profile', 'setting'].includes(route.kind);
   const humanBehaviourActive = route.kind === 'human-behaviour';
+  const frontPageActive = ['home', 'feed'].includes(route.kind) && !searchActive && !focusedPost;
 
   return (
     <div className={`app-shell ${appReady ? 'app-ready' : 'app-starting'}`} id="top" aria-busy={!appReady}>
@@ -737,7 +738,7 @@ export default function App() {
         </main>
       )}
 
-      <SiteFooter />
+      {frontPageActive && <SiteFooter />}
       <BottomDock onUpload={() => openUpload()} onChange={() => openMe(true)} onMe={() => openMe(false)} />
 
       <UploadModal

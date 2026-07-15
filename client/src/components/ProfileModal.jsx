@@ -1,11 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpenText, Camera, Download, FileClock, ImagePlus, LoaderCircle, Play, Save, Trash2, UserMinus, UserPlus, UsersRound, X } from 'lucide-react';
+import { BookOpenText, Camera, Download, FileClock, ImagePlus, LoaderCircle, Play, Save, Trash2, UsersRound, X } from 'lucide-react';
 import { api, normalizePostShape, normalizeUserShape } from '../lib/api';
 import { deletePostDraft, listPostDrafts } from '../lib/drafts';
 import { Avatar, FeedCard } from './Feed';
 
 function exactCount(value) {
   return Number(value || 0).toLocaleString('en-US').replaceAll(',', '');
+}
+
+function RelationshipScene({ direction, active = false }) {
+  const towardMe = direction === 'followers';
+  return (
+    <svg className={`relationship-scene ${towardMe ? 'toward-me' : 'toward-other'} ${active ? 'is-active' : ''}`} viewBox="0 0 210 92" aria-hidden="true">
+      <path className="relationship-ground" d="M8 79c36-7 64 4 98 0s61-2 96 1" />
+      {towardMe ? (
+        <>
+          <g className="scene-person scene-me standing" transform="translate(91 13)"><circle cx="14" cy="11" r="10" /><path d="M7 24c2-6 12-6 15 0l4 27H3Z" /><path d="m8 50-4 24m17-24 5 24M6 31-1 49m24-18 8 17" /></g>
+          {[12, 47, 151, 181].map((x, index) => <g className={`scene-person scene-other runner runner-${index + 1}`} transform={`translate(${x} ${25 + (index % 2) * 8})`} key={x}><circle cx="8" cy="8" r="7" /><path d="M5 18c2-4 7-4 10 0l3 19H2Z" /><path d="m5 36-5 13m15-13 7 11M4 24l-8 6m19-6 7 5" /></g>)}
+          <text className="scene-label label-me" x="105" y="88">me</text><text className="scene-label label-other" x="20" y="18">others</text>
+        </>
+      ) : (
+        <>
+          <g className="scene-person scene-other standing" transform="translate(160 13)"><circle cx="14" cy="11" r="10" /><path d="M7 24c2-6 12-6 15 0l4 27H3Z" /><path d="m8 50-4 24m17-24 5 24M6 31-1 49m24-18 8 17" /></g>
+          <g className="scene-person scene-me runner runner-me" transform="translate(45 32)"><circle cx="10" cy="9" r="8" /><path d="M6 20c2-5 9-5 12 0l4 22H2Z" /><path d="m7 41-7 18m18-18 11 14M5 27l-12 7m25-7 11 5" /></g>
+          <path className="scene-motion" d="M16 48h22m-27 9h27" />
+          <text className="scene-label label-me" x="50" y="88">me</text><text className="scene-label label-other" x="164" y="88">other</text>
+        </>
+      )}
+    </svg>
+  );
 }
 
 const postFilters = [
@@ -204,32 +227,36 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
   return (
     <main className="profile-page" id="main-content">
       <section className="profile-page-card">
-        <div className="profile-sky">
-          <div className="profile-orbit orbit-one" /><div className="profile-orbit orbit-two" />
-          <div className="profile-wings">
-            <button type="button" className="wing wing-left" onClick={() => showRelationships('followers')} aria-label={`${exactCount(person.followers)} people want to be with ${isOwn ? 'you' : person.name}`}>
-              <span><strong>{exactCount(person.followers)}</strong><small>The people who want<br />to be with {isOwn ? 'me' : 'them'}</small></span>
-            </button>
-            <div className="profile-center">
-              <Avatar person={shownPerson} size="hero" />
-              <h3>{person.name}</h3>
-              <p>@{person.username}</p>
-            </div>
-            <button type="button" className="wing wing-right" onClick={() => showRelationships('following')} aria-label={`${exactCount(person.following)} people ${isOwn ? 'you want' : `${person.name} wants`} to be with`}>
-              <span><strong>{exactCount(person.following)}</strong><small>The people {isOwn ? 'I' : 'they'} want<br />to be with</small></span>
-            </button>
-          </div>
-          {person.bio && <p className="profile-bio">{person.bio}</p>}
-          {isOwn ? (
-            <button type="button" className="secondary-button profile-change" onClick={() => {
-              const next = !editing;
-              if (!editing || !profileDirty) setEditing(next);
-              onEditingChange?.(next);
-            }}><Camera size={16} /> Change profile photo</button>
+        <div className={`profile-sky ${editing ? 'editing-profile-sky' : ''}`}>
+          {editing ? (
+            <div className="change-profile-picture-preview"><Avatar person={shownPerson} size="hero" /><strong>Change profile picture</strong></div>
           ) : (
-            <button type="button" className={`primary-button profile-follow ${person.isFollowing ? 'following' : ''}`} onClick={() => onFollow(person)}>
-              {person.isFollowing ? <><UserMinus size={16} /> Stop being with</> : <><UserPlus size={16} /> Be with them</>}
-            </button>
+            <>
+              <div className="profile-orbit orbit-one" /><div className="profile-orbit orbit-two" />
+              <div className="profile-avatar-top"><Avatar person={shownPerson} size="hero" /></div>
+              <div className="profile-name-side"><p><strong>Name:</strong><span>{person.name}</span></p><p><strong>Username:</strong><span>@{person.username}</span></p></div>
+              <div className={`profile-relationship-stage ${person.isFollowing ? 'viewer-connected' : ''}`}>
+                <div className="relationship-side">
+                  <button type="button" className="relationship-scene-button followers-scene" onClick={() => showRelationships('followers')} aria-label={`${exactCount(person.followers)} people want to be with ${isOwn ? 'you' : person.name}`}>
+                    <RelationshipScene direction="followers" />
+                    <span><strong>{exactCount(person.followers)}</strong><small>The people who want to be with {isOwn ? 'me' : 'them'}</small></span>
+                  </button>
+                </div>
+                <div className="relationship-side">
+                  <button type="button" className="relationship-scene-button following-scene" onClick={() => showRelationships('following')} aria-label={`${exactCount(person.following)} people ${isOwn ? 'you want' : `${person.name} wants`} to be with`}>
+                    <RelationshipScene direction="following" active={!isOwn && person.isFollowing} />
+                    <span><strong>{exactCount(person.following)}</strong><small>The people {isOwn ? 'I' : 'they'} want to be with</small></span>
+                  </button>
+                  {!isOwn && <button type="button" className={`profile-follow-click ${person.isFollowing ? 'following' : ''}`} onClick={() => onFollow(person)} aria-pressed={Boolean(person.isFollowing)}>Click here</button>}
+                </div>
+              </div>
+              {person.bio && <p className="profile-bio">{person.bio}</p>}
+              {isOwn && <button type="button" className="secondary-button profile-change" onClick={() => {
+                const next = !editing;
+                if (!editing || !profileDirty) setEditing(next);
+                onEditingChange?.(next);
+              }}><Camera size={16} /> Change profile photo</button>}
+            </>
           )}
         </div>
 

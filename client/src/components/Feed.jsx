@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronLeft, ChevronRight, Facebook, Github, Globe2, Info, Instagram, Linkedin, MessageCircle, Pencil, Play, Send, Square, Trash2, X, Youtube } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronLeft, ChevronRight, Facebook, Github, Globe2, Image as ImageIcon, Info, Instagram, Linkedin, MessageCircle, Pencil, Play, Send, Smartphone, Square, Trash2, Video, X, Youtube } from 'lucide-react';
 import { api } from '../lib/api';
 import { trackAnalytics } from '../lib/analytics';
 import { useInView, useReducedMotion } from '../lib/hooks';
@@ -35,19 +35,13 @@ function DrumSoundIcon({ soundOn }) {
   );
 }
 
-function HumanRopeIcon({ expanded }) {
+function PictureScreenIcon({ expanded }) {
   return (
-    <svg className={`human-rope-icon ${expanded ? 'is-expanded' : ''}`} viewBox="0 0 42 32" aria-hidden="true">
-      <path className="stretch-rope rope-left" d={expanded ? 'M1 10 14 13' : 'M8 12c2 0 3 1 6 1'} />
-      <path className="stretch-rope rope-right" d={expanded ? 'M28 13 41 10' : 'M28 13c3 0 4-1 6-1'} />
-      {expanded && <><circle className="stretch-rope-end" cx="2" cy="10" r="1.5" /><circle className="stretch-rope-end" cx="40" cy="10" r="1.5" /></>}
-      <circle className="stretch-head" cx="21" cy="6" r="4" />
-      <path className="stretch-body" d="M17 13c1-3 2-4 4-4s3 1 4 4l1 9-3 1-1-7v13h-3V16l-1 7-3-1 2-9Z" />
-      <path className="stretch-arm arm-left" d="M18 13h-4" />
-      <path className="stretch-arm arm-right" d="M24 13h4" />
-      <circle className="stretch-hand" cx="14" cy="13" r="1.6" />
-      <circle className="stretch-hand" cx="28" cy="13" r="1.6" />
-      <path className="stretch-leg" d="m20 29-4 2m6-2 4 2" />
+    <svg className={`picture-screen-icon ${expanded ? 'is-expanded' : ''}`} viewBox="0 0 44 38" aria-hidden="true">
+      <rect className="picture-screen-body" x={expanded ? 2 : 11} y={expanded ? 5 : 2} width={expanded ? 40 : 22} height={expanded ? 28 : 34} rx="4" />
+      <circle className="picture-screen-sun" cx={expanded ? 32 : 27} cy="12" r="3" />
+      <path className="picture-screen-land" d={expanded ? 'M7 28 16 18l7 7 6-6 8 9Z' : 'M14 30 20 21l4 5 4-4 3 8Z'} />
+      {!expanded && <circle className="picture-screen-home" cx="22" cy="33" r="1.3" />}
     </svg>
   );
 }
@@ -64,20 +58,20 @@ function FilesFolderIcon({ open }) {
   );
 }
 
-function MercedesZoomIcon({ pan }) {
+function TelescopeZoomIcon() {
   return (
-    <svg className="mercedes-zoom-icon" viewBox="0 0 58 42" aria-hidden="true">
-      <circle className="zoom-sun" cx="46" cy="9" r="6" />
-      <path className="zoom-sea" d="M2 17c8-4 14 4 22 0s14 4 22 0 8 0 10 0v8H2Z" />
-      <path className="zoom-road" d="m18 20 20 0 15 20H5Z" />
-      <path className="zoom-lane" d="m28 23 1 5m1 3 2 7" />
-      <g className="zoom-car-group" style={{ transform: `translate(${pan.x * 0.18}px, ${pan.y * 0.12}px)` }}>
-        <path className="zoom-car" d="M16 30h25l4 4v4H12v-4l4-4Zm5 0 3-5h11l4 5" />
-        <circle className="zoom-wheel" cx="18" cy="38" r="3" /><circle className="zoom-wheel" cx="39" cy="38" r="3" />
-        <circle className="zoom-star" cx="29" cy="34" r="2.5" /><path className="zoom-star" d="M29 31.5v5M26.8 35.3l4.4-2.6m0 2.6-4.4-2.6" />
-      </g>
+    <svg className="telescope-zoom-icon" viewBox="0 0 58 44" aria-hidden="true">
+      <defs><linearGradient id="scopeBody" x1="0" x2="1"><stop stopColor="#d9f3ff" /><stop offset=".45" stopColor="#315b6b" /><stop offset="1" stopColor="#172b33" /></linearGradient><linearGradient id="scopeLens"><stop stopColor="#fff" /><stop offset=".45" stopColor="#79d7f3" /><stop offset="1" stopColor="#18516b" /></linearGradient></defs>
+      <path className="scope-shadow" d="M8 35h43l-7 6H14Z" />
+      <g className="scope-body"><path d="m13 8 30 9-5 16-30-9Z" fill="url(#scopeBody)" /><ellipse cx="11" cy="16" rx="6" ry="10" transform="rotate(17 11 16)" fill="url(#scopeLens)" /><ellipse cx="42" cy="25" rx="4" ry="8" transform="rotate(17 42 25)" /></g>
+      <path className="scope-stand" d="m31 29-7 13m7-13 8 13m-8-13v13" />
     </svg>
   );
+}
+
+function MediaLoading({ kind }) {
+  const Icon = kind === 'photo' ? ImageIcon : kind === 'short-video' ? Smartphone : Video;
+  return <div className={`media-format-loading loading-${kind}`} role="status"><Icon size={34} /><strong>Loading<span className="loading-dots" aria-hidden="true">...</span></strong></div>;
 }
 
 function PlatformIcon({ platform, size = 18 }) {
@@ -124,7 +118,7 @@ function ImageSlide({ item, index, preview, priority, zoom, pan }) {
         onError={() => setStatus('error')}
         style={{ transform: `translate(${pan.x}%, ${pan.y}%) scale(${zoom})` }}
       />
-      {status === 'loading' && <span className="media-loading-message">Loading photo…</span>}
+      {status === 'loading' && <MediaLoading kind="photo" />}
       {status === 'error' && <AssetError message="This photo could not be loaded." onRetry={() => { setStatus('loading'); setRetryKey((value) => value + 1); }} />}
     </div>
   );
@@ -136,7 +130,6 @@ function VideoSlide({ item, active, inView, controlsVisible, analyticsContext, m
   const [status, setStatus] = useState('loading');
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [manual, setManual] = useState({ hours: '', minutes: '', seconds: '' });
   const [retryKey, setRetryKey] = useState(0);
   useEffect(() => {
     const video = videoRef.current;
@@ -185,7 +178,7 @@ function VideoSlide({ item, active, inView, controlsVisible, analyticsContext, m
         onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime || 0)}
         onError={() => setStatus('error')}
       />
-      {status === 'loading' && <span className="media-loading-message">Loading video details…</span>}
+      {status === 'loading' && <MediaLoading kind={analyticsContext?.format === 'short-video' ? 'short-video' : 'video'} />}
       {status === 'error' && <AssetError message="This video could not be loaded." onRetry={() => { setStatus('loading'); setRetryKey((value) => value + 1); }} />}
       {controlsVisible && status !== 'error' && <button type="button" className="media-play" onClick={(event) => { event.stopPropagation(); setPaused((value) => !value); }} aria-label={paused ? 'Play video' : 'Stop video'}>
         {paused ? <Play size={22} fill="currentColor" /> : <Square size={20} fill="currentColor" />}
@@ -193,28 +186,22 @@ function VideoSlide({ item, active, inView, controlsVisible, analyticsContext, m
       {controlsVisible && status !== 'error' && (
         <div className="video-time-controls" onClick={(event) => event.stopPropagation()}>
           <div className="video-time-readout"><strong>{formatMediaTime(currentTime)}</strong><span>/</span><strong>{formatMediaTime(duration)}</strong></div>
-          <input
-            className="video-seek"
-            type="range"
-            min="0"
-            max={Math.max(duration, 0.1)}
-            step="0.1"
-            value={Math.min(currentTime, Math.max(duration, 0.1))}
-            aria-label="Choose the video time"
-            style={{ '--watched': `${duration ? (currentTime / duration) * 100 : 0}%` }}
-            onPointerDown={(event) => { event.currentTarget.setPointerCapture?.(event.pointerId); seekAndPlay(event.currentTarget.value); }}
-            onInput={(event) => seekAndPlay(event.currentTarget.value)}
-            onChange={(event) => seekAndPlay(event.currentTarget.value)}
-          />
-          <div className="manual-time-jump">
-            {['hours', 'minutes', 'seconds'].map((unit, unitIndex) => <span className="manual-time-unit" key={unit}>
-              {unitIndex > 0 && <b className="time-colon" aria-hidden="true">:</b>}
-              <label><input aria-label={`Enter ${unit}`} placeholder="00" type="number" min="0" max={unit === 'hours' ? 999 : 59} inputMode="numeric" value={manual[unit]} onChange={(event) => setManual((value) => ({ ...value, [unit]: event.target.value.replace(/\D/g, '').slice(0, 3) }))} /><small>{unit}</small></label>
-            </span>)}
-            <button type="button" onClick={() => {
-              const requested = Number(manual.hours || 0) * 3600 + Number(manual.minutes || 0) * 60 + Number(manual.seconds || 0);
-              seekAndPlay(requested);
-            }}>Add time to go there</button>
+          <div className="magnetic-tape-timeline" style={{ '--tape-progress': `${duration ? (currentTime / duration) * 100 : 0}%`, '--tape-turn': `${duration ? (currentTime / duration) * 720 : 0}deg` }}>
+            <span className="tape-reel tape-source" aria-hidden="true"><i /><i /><i /></span>
+            <span className="tape-ribbon" aria-hidden="true"><i /></span>
+            <span className="tape-reel tape-takeup" aria-hidden="true"><i /><i /><i /></span>
+            <input
+              className="video-seek"
+              type="range"
+              min="0"
+              max={Math.max(duration, 0.1)}
+              step="0.1"
+              value={Math.min(currentTime, Math.max(duration, 0.1))}
+              aria-label="Drag the magnetic tape to choose the video time"
+              onPointerDown={(event) => { event.currentTarget.setPointerCapture?.(event.pointerId); seekAndPlay(event.currentTarget.value); }}
+              onInput={(event) => seekAndPlay(event.currentTarget.value)}
+              onChange={(event) => seekAndPlay(event.currentTarget.value)}
+            />
           </div>
         </div>
       )}
@@ -230,11 +217,16 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
   const [carouselPaused, setCarouselPaused] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [boundaryNotice, setBoundaryNotice] = useState('');
+  const [orientationMode, setOrientationMode] = useState('auto');
+  const [deviceOrientation, setDeviceOrientation] = useState(() => window.matchMedia?.('(orientation: portrait)').matches ? 'portrait' : 'landscape');
   const [muted, setMuted] = useState(true);
   const [containerRef, inView] = useInView();
   const reducedMotion = useReducedMotion();
   const touchStart = useRef(null);
+  const pinchStart = useRef(null);
   const current = media[index];
+  const shownOrientation = orientationMode === 'auto' ? deviceOrientation : orientationMode;
 
   useEffect(() => {
     if (!inView || reducedMotion || media.length < 2 || preview || carouselPaused) return undefined;
@@ -256,6 +248,16 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
     };
   }, [containerRef]);
 
+  useEffect(() => {
+    const update = () => setDeviceOrientation(window.matchMedia?.('(orientation: portrait)').matches ? 'portrait' : 'landscape');
+    window.addEventListener('resize', update);
+    screen.orientation?.addEventListener?.('change', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      screen.orientation?.removeEventListener?.('change', update);
+    };
+  }, []);
+
   const move = (direction) => {
     if (!media.length) return;
     setIndex((value) => (value + direction + media.length) % media.length);
@@ -264,13 +266,15 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
   useEffect(() => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
+    setBoundaryNotice('');
   }, [index]);
 
   const zoomLimit = (value = zoom) => Math.max(0, ((value - 1) / value) * 48);
   const changeZoom = (nextZoom) => {
-    const next = Number(nextZoom);
+    const next = Math.min(3, Math.max(1, Number(nextZoom)));
     const limit = zoomLimit(next);
     setZoom(next);
+    if (next > 1) setCarouselPaused(true);
     setPan((value) => ({
       x: Math.min(limit, Math.max(-limit, value.x)),
       y: Math.min(limit, Math.max(-limit, value.y)),
@@ -279,7 +283,14 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
   const movePhoto = (axis, amount) => {
     const limit = zoomLimit();
     if (!limit) return;
-    setPan((value) => ({ ...value, [axis]: Math.min(limit, Math.max(-limit, value[axis] + amount)) }));
+    setCarouselPaused(true);
+    setPan((value) => {
+      const requested = value[axis] + amount;
+      const moved = Math.min(limit, Math.max(-limit, requested));
+      if (moved === value[axis] || moved !== requested) setBoundaryNotice('Fully moved in this direction.');
+      else setBoundaryNotice('');
+      return { ...value, [axis]: moved };
+    });
   };
 
   const toggleFullscreen = async () => {
@@ -305,16 +316,37 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
   return (
     <div
       ref={containerRef}
-      className={`media-carousel ${short ? 'short-carousel' : ''} ${controlsVisible ? 'controls-visible' : ''}`}
+      className={`media-carousel ${short ? 'short-carousel' : ''} ${controlsVisible ? 'controls-visible' : ''} orientation-${shownOrientation}`}
       onClick={() => {
         if (preview) return;
+        if (current.type !== 'video' && media.length > 1) setCarouselPaused(true);
         setControlsVisible((value) => {
           if (value) setToolboxOpen(false);
           return !value;
         });
       }}
-      onTouchStart={(event) => { touchStart.current = event.touches[0].clientX; }}
+      onTouchStart={(event) => {
+        if (current.type !== 'video' && event.touches.length === 2) {
+          const [first, second] = event.touches;
+          pinchStart.current = { distance: Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY), zoom };
+          touchStart.current = null;
+          setCarouselPaused(true);
+          return;
+        }
+        touchStart.current = event.touches[0]?.clientX ?? null;
+      }}
+      onTouchMove={(event) => {
+        if (!pinchStart.current || event.touches.length !== 2) return;
+        event.preventDefault();
+        const [first, second] = event.touches;
+        const distance = Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
+        changeZoom(pinchStart.current.zoom * (distance / Math.max(1, pinchStart.current.distance)));
+      }}
       onTouchEnd={(event) => {
+        if (pinchStart.current) {
+          if (event.touches.length < 2) pinchStart.current = null;
+          return;
+        }
         if (touchStart.current == null) return;
         const distance = event.changedTouches[0].clientX - touchStart.current;
         if (Math.abs(distance) > 45) move(distance > 0 ? -1 : 1);
@@ -327,6 +359,7 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
         ) : (
           <ImageSlide item={current} index={index} preview={preview} priority={priority} zoom={zoom} pan={pan} />
         )}
+        {boundaryNotice && <div className="media-boundary-notice" role="status"><span>{boundaryNotice}</span><button type="button" onClick={(event) => { event.stopPropagation(); setBoundaryNotice(''); }} aria-label="Close movement message"><X size={16} /></button></div>}
         {media.length > 1 && (
           <>
             <button type="button" className="page-fold page-fold-left" onClick={(event) => { event.stopPropagation(); move(-1); }} aria-label="Previous item">
@@ -338,16 +371,21 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
           </>
         )}
         {!preview && controlsVisible && current.type !== 'video' && media.length > 1 && <button type="button" className="media-play carousel-play" onClick={(event) => { event.stopPropagation(); setCarouselPaused((value) => !value); }} aria-label={carouselPaused ? 'Continue photo carousel' : 'Stop photo carousel'}>{carouselPaused ? <Play size={22} fill="currentColor" /> : <Square size={20} fill="currentColor" />}</button>}
-        {!preview && controlsVisible && <button type="button" className={`media-toolbox-trigger ${toolboxOpen ? 'active' : ''}`} onClick={(event) => { event.stopPropagation(); setToolboxOpen((value) => !value); }} aria-expanded={toolboxOpen} aria-label="More options"><FilesFolderIcon open={toolboxOpen} /><span>More options</span></button>}
+        {!preview && controlsVisible && <button type="button" className={`media-toolbox-trigger ${toolboxOpen ? 'active' : ''}`} onClick={(event) => { event.stopPropagation(); if (current.type !== 'video') setCarouselPaused(true); setToolboxOpen((value) => !value); }} aria-expanded={toolboxOpen} aria-label="More options"><FilesFolderIcon open={toolboxOpen} /><span>More options</span></button>}
         {!preview && controlsVisible && toolboxOpen && (
           <div className="media-toolbox" onClick={(event) => event.stopPropagation()}>
             <header><strong>More options</strong><button type="button" onClick={() => setToolboxOpen(false)} aria-label="Close more options"><X size={18} /></button></header>
-            <button type="button" className={`media-fullscreen ${fullscreen ? 'active' : ''}`} onClick={toggleFullscreen} aria-label={fullscreen ? 'Exit full screen' : 'View media full screen'}><HumanRopeIcon expanded={fullscreen} /><span>{fullscreen ? 'Exit full screen' : 'Full screen'}</span></button>
+            <button type="button" className={`media-fullscreen ${fullscreen ? 'active' : ''}`} onClick={toggleFullscreen} aria-label={fullscreen ? 'Exit full screen' : 'View media full screen'}><PictureScreenIcon expanded={fullscreen} /><span>{fullscreen ? 'Exit full screen' : 'Full screen'}</span></button>
+            <div className="orientation-control" aria-label="Choose post posture">
+              <button type="button" className={orientationMode === 'portrait' ? 'active' : ''} onClick={() => setOrientationMode('portrait')}><span className="posture-screen stand" /><b>Stand posture</b></button>
+              <button type="button" className={orientationMode === 'landscape' ? 'active' : ''} onClick={() => setOrientationMode('landscape')}><span className="posture-screen sleep" /><b>Sleep posture</b></button>
+              <button type="button" className={orientationMode === 'auto' ? 'active' : ''} onClick={() => setOrientationMode('auto')}><Smartphone size={18} /><b>Follow device</b></button>
+            </div>
             {current.type === 'video' ? (
               <button type="button" className={`media-sound ${muted ? 'muted' : 'sound-on'}`} onClick={() => setMuted((value) => !value)} aria-label={muted ? 'Turn sound on' : 'Mute video'} title={muted ? 'Turn sound on' : 'Mute video'}><DrumSoundIcon soundOn={!muted} /><span>{muted ? 'Sound off' : 'Sound on'}</span></button>
             ) : (
               <div className="media-zoom-control">
-                <MercedesZoomIcon pan={pan} />
+                <TelescopeZoomIcon />
                 <span>Photo zoom <b>{Math.round(zoom * 100)}%</b></span>
                 <input type="range" min="1" max="3" step="0.05" value={zoom} onChange={(event) => changeZoom(event.target.value)} aria-label="Zoom photo in or out" />
                 <div className={`photo-pan-pad ${zoom === 1 ? 'disabled' : ''}`} aria-label="Move around the zoomed photo">

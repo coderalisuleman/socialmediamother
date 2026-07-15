@@ -29,7 +29,7 @@ function countryOptions() {
   }).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function PasswordField({ label, value, onChange, autoComplete = 'new-password', required = true }) {
+export function PasswordField({ label, value, onChange, autoComplete = 'new-password', required = true }) {
   const [shown, setShown] = useState(false);
   return (
     <label className="password-field">

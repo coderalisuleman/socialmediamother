@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+
 function YoutubeMark() {
   return (
     <svg viewBox="0 0 32 22" aria-hidden="true" className="youtube-mark">
@@ -23,8 +26,14 @@ export function MissionNote({ compact = false }) {
 }
 
 export default function SiteFooter() {
+  const [hidden, setHidden] = useState(false);
   return (
-    <footer className="site-footer">
+    <div className={`site-footer-shell ${hidden ? 'footer-hidden' : ''}`}>
+      <button type="button" className="site-footer-toggle" onClick={() => setHidden((value) => !value)} aria-expanded={!hidden} aria-label={hidden ? 'See footer' : 'Hide footer'} title={hidden ? 'See' : 'Hide'}>
+        {hidden ? <ChevronUp size={25} /> : <ChevronDown size={25} />}
+        <span className="control-tooltip">{hidden ? 'See' : 'Hide'}</span>
+      </button>
+      <footer className="site-footer">
       <a href="/" className="footer-identity" aria-label="Social Media Mother home">
         <span className="brand-hug-picture footer-hug-picture" style={{ '--brand-picture-size': '64px' }}>
           <img src="/icon-192.png" alt="Social Media Mother" width="64" height="64" loading="lazy" />
@@ -33,6 +42,7 @@ export default function SiteFooter() {
         <span>Social Media Mother</span>
       </a>
       <MissionNote compact />
-    </footer>
+      </footer>
+    </div>
   );
 }

@@ -645,7 +645,7 @@ export default function App() {
   return (
     <div className={`app-shell ${appReady ? 'app-ready' : 'app-starting'}`} id="top" aria-busy={!appReady}>
       <a className="skip-link" href="#main-content">Skip to posts</a>
-      <button type="button" className="global-back-button" onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/'); }} aria-label="Go back one page"><ArrowLeft size={18} /> Back</button>
+      {!frontPageActive && <button type="button" className="global-back-button" onClick={() => { if (window.history.length > 1) window.history.back(); else navigate('/'); }} aria-label="Go back one page"><ArrowLeft size={18} /> Back</button>}
       {!appReady && <div className="startup-wait" role="status"><span /><strong>Opening Social Media Mother…</strong><small>Please wait while every button becomes ready.</small></div>}
       {connection === 'offline' && <div className="connection-alert" role="alert"><strong>Your internet is offline.</strong><span>Already loaded things may remain visible. Reconnect, then use Retry on anything that did not load.</span></div>}
       <Nav

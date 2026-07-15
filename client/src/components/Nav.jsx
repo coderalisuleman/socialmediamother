@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
+import { ChevronDown, Search, X } from 'lucide-react';
 
 function FeedSwitch({ feedMode, onFeedMode }) {
   return (
@@ -34,8 +34,7 @@ export default function Nav({ query, onQuery, feedMode, onFeedMode, user, onHome
   return (
     <header className={`top-shell ${hidden ? 'navigation-hidden' : ''}`}>
       <button type="button" className="top-navigation-toggle" onClick={() => setHidden((value) => !value)} aria-expanded={!hidden} aria-label={hidden ? 'See navigation' : 'Hide navigation'} title={hidden ? 'See' : 'Hide'}>
-        {hidden ? <ChevronDown size={25} /> : <ChevronUp size={25} />}
-        <span className="minimized-control-label">Navigation</span>
+        <ChevronDown size={25} />
         <span className="control-tooltip">{hidden ? 'See' : 'Hide'}</span>
       </button>
       <nav className="top-nav" aria-label="Main navigation">

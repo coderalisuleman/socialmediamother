@@ -4,6 +4,15 @@
   "private": true,
   "type": "module",
   "description": "A welcoming, creator-first social platform by Ali Suleman.",
+  "homepage": "https://socialmediamother.onrender.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/coderalisuleman/socialmediamother.git"
+  },
+  "author": {
+    "name": "Coder Ali Suleman",
+    "url": "https://github.com/coderalisuleman"
+  },
   "workspaces": [
     "client",
     "server"

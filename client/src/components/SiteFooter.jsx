@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronUp } from 'lucide-react';
 
 function YoutubeMark() {
   return (
@@ -30,8 +30,7 @@ export default function SiteFooter() {
   return (
     <div className={`site-footer-shell ${hidden ? 'footer-hidden' : ''}`}>
       <button type="button" className="site-footer-toggle" onClick={() => setHidden((value) => !value)} aria-expanded={!hidden} aria-label={hidden ? 'See footer' : 'Hide footer'} title={hidden ? 'See' : 'Hide'}>
-        {hidden ? <ChevronUp size={25} /> : <ChevronDown size={25} />}
-        <span className="minimized-control-label">Footer</span>
+        <ChevronUp size={25} />
         <span className="control-tooltip">{hidden ? 'See' : 'Hide'}</span>
       </button>
       <footer className="site-footer">

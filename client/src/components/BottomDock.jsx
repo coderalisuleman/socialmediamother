@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Plus, UserRound } from 'lucide-react';
+import { ChevronUp, Plus, UserRound } from 'lucide-react';
 
 function ChangeShirtIcon() {
   return (
@@ -21,8 +21,7 @@ export default function BottomDock({ onUpload, onChange, onMe }) {
         <button type="button" onClick={onMe}><UserRound size={19} /><span>Me</span></button>
       </nav>
       <button type="button" className="bottom-dock-toggle" onClick={() => setHidden((value) => !value)} aria-expanded={!hidden} aria-label={hidden ? 'See bottom actions' : 'Hide bottom actions'} title={hidden ? 'See' : 'Hide'}>
-        {hidden ? <ChevronUp size={25} /> : <ChevronDown size={25} />}
-        <span className="minimized-control-label">Bottom actions</span>
+        <ChevronUp size={25} />
         <span className="control-tooltip">{hidden ? 'See' : 'Hide'}</span>
       </button>
     </div>

@@ -2,7 +2,7 @@
 
 Social Media Mother is a full-stack social platform for text, photo, video, and short-video posts. It uses a fast Vite + React client, an Express API, MongoDB/Mongoose for social data, MongoDB GridFS streaming for uploaded media, and optional AWS SES/SNS verification.
 
-The public canonical address is [socialmediamother.onrender.com](https://socialmediamother.onrender.com), and the owner link points to [Coder Ali Suleman on YouTube](https://youtube.com/@coderalisuleman).
+The public canonical address is [socialmediamother.onrender.com](https://socialmediamother.onrender.com). The creator is [Coder Ali Suleman on GitHub](https://github.com/coderalisuleman), and the owner link points to [Coder Ali Suleman on YouTube](https://youtube.com/@coderalisuleman).
 
 ## What is included
 

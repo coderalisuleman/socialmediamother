@@ -132,7 +132,7 @@ function ImageSlide({ item, index, preview, priority, zoom, pan }) {
         src={item.src}
         alt={item.alt || `Post image ${index + 1}`}
         loading={(preview || priority) && index === 0 ? 'eager' : 'lazy'}
-        fetchPriority={(preview || priority) && index === 0 ? 'high' : 'auto'}
+        fetchpriority={(preview || priority) && index === 0 ? 'high' : 'auto'}
         onLoad={() => setStatus('ready')}
         onError={() => setStatus('error')}
         style={{ transform: `translate(${pan.x}%, ${pan.y}%) scale(${zoom})` }}
@@ -178,6 +178,8 @@ function VideoSlide({ item, active, inView, controlsVisible, analyticsContext, m
     };
   }, [active, analyticsContext?.format, analyticsContext?.postAuthorId, analyticsContext?.postId, inView, paused, status]);
 
+  const watchedPercent = duration ? Math.min(100, Math.max(0, Math.round((currentTime / duration) * 100))) : 0;
+
   return (
     <div className={`video-wrap ${status === 'loading' ? 'media-is-loading' : ''}`}>
       <video
@@ -205,7 +207,8 @@ function VideoSlide({ item, active, inView, controlsVisible, analyticsContext, m
       {controlsVisible && status !== 'error' && (
         <div className="video-time-controls" onClick={(event) => event.stopPropagation()}>
           <div className="video-time-readout"><strong>{formatMediaTime(currentTime)}</strong><span>of</span><strong>{formatMediaTime(duration)}</strong></div>
-          <div className={`camera-film-timeline ${paused ? 'is-paused' : ''}`} style={{ '--film-progress': `${duration ? (currentTime / duration) * 100 : 0}%` }}>
+          <div className="film-progress-explanation" aria-hidden="true"><span className="watched-key"><i />Watched {watchedPercent}%</span><span className="left-key"><i />Left {100 - watchedPercent}%</span></div>
+          <div className={`camera-film-timeline ${paused ? 'is-paused' : ''}`} style={{ '--film-progress': `${watchedPercent}%` }}>
             <span className="film-camera" aria-hidden="true"><CameraFilmIcon /></span>
             <span className="film-strip" aria-hidden="true">
               <i className="film-watched" />
@@ -233,6 +236,7 @@ function VideoSlide({ item, active, inView, controlsVisible, analyticsContext, m
 export function MediaCarousel({ media = [], short = false, preview = false, priority = false, postId = '', postAuthorId = '', postFormat = '' }) {
   const [index, setIndex] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
+  const [postureFallback, setPostureFallback] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(false);
   const [toolboxOpen, setToolboxOpen] = useState(false);
   const [carouselPaused, setCarouselPaused] = useState(false);
@@ -248,6 +252,7 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
   const pinchStart = useRef(null);
   const current = media[index];
   const shownOrientation = orientationMode === 'auto' ? deviceOrientation : orientationMode;
+  const mediaExpanded = fullscreen || postureFallback;
 
   useEffect(() => {
     if (!inView || reducedMotion || media.length < 2 || preview || carouselPaused) return undefined;
@@ -260,7 +265,11 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
   }, [index, media.length]);
 
   useEffect(() => {
-    const update = () => setFullscreen(document.fullscreenElement === containerRef.current || document.webkitFullscreenElement === containerRef.current);
+    const update = () => {
+      const active = document.fullscreenElement === containerRef.current || document.webkitFullscreenElement === containerRef.current;
+      setFullscreen(active);
+      if (active) setPostureFallback(false);
+    };
     document.addEventListener('fullscreenchange', update);
     document.addEventListener('webkitfullscreenchange', update);
     return () => {
@@ -281,6 +290,7 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
 
   const move = (direction) => {
     if (!media.length) return;
+    setCarouselPaused(true);
     setIndex((value) => (value + direction + media.length) % media.length);
   };
 
@@ -318,6 +328,11 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
     const node = containerRef.current;
     const active = document.fullscreenElement || document.webkitFullscreenElement;
     try {
+      if (postureFallback && !active) {
+        setPostureFallback(false);
+        try { screen.orientation?.unlock?.(); } catch { /* Orientation unlock is optional. */ }
+        return;
+      }
       if (active) {
         if (document.exitFullscreen) await document.exitFullscreen();
         else document.webkitExitFullscreen?.();
@@ -333,13 +348,53 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
     }
   };
 
+  const applyOrientationMode = async (mode) => {
+    setOrientationMode(mode);
+    if (mode === 'auto') {
+      setPostureFallback(false);
+      try { screen.orientation?.unlock?.(); } catch { /* The browser may not expose orientation controls. */ }
+      setDeviceOrientation(window.matchMedia?.('(orientation: portrait)').matches ? 'portrait' : 'landscape');
+      return;
+    }
+
+    const node = containerRef.current;
+    const activeFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+    let enteredFullscreen = Boolean(activeFullscreen);
+    try {
+      if (!activeFullscreen) {
+        if (node?.requestFullscreen) await node.requestFullscreen();
+        else if (node?.webkitRequestFullscreen) await node.webkitRequestFullscreen();
+      }
+      enteredFullscreen = document.fullscreenElement === node || document.webkitFullscreenElement === node;
+    } catch {
+      // The strict CSS posture below still applies if fullscreen is unavailable.
+    }
+    setPostureFallback(!enteredFullscreen);
+    try { if (enteredFullscreen) await screen.orientation?.lock?.(mode); } catch {
+      // Desktop and iOS browsers can reject rotation locks; the media shape remains strict.
+    }
+  };
+
   if (!current) return null;
   return (
     <div
       ref={containerRef}
-      className={`media-carousel ${short ? 'short-carousel' : ''} ${controlsVisible ? 'controls-visible' : ''} orientation-${shownOrientation}`}
-      onClick={() => {
+      className={`media-carousel ${short ? 'short-carousel' : ''} ${controlsVisible ? 'controls-visible' : ''} ${postureFallback ? 'posture-fallback' : ''} orientation-${shownOrientation} orientation-mode-${orientationMode}`}
+      tabIndex={media.length > 1 ? 0 : undefined}
+      aria-label={media.length > 1 ? `Media carousel. Item ${index + 1} of ${media.length}. Use the left and right keyboard arrows to move.` : undefined}
+      onKeyDown={(event) => {
+        if (event.target.closest('button,input,a,select,textarea')) return;
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          move(-1);
+        } else if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          move(1);
+        }
+      }}
+      onClick={(event) => {
         if (preview) return;
+        if (!event.target.closest('button,input,a,select,textarea')) containerRef.current?.focus?.({ preventScroll: true });
         if (current.type !== 'video' && media.length > 1) setCarouselPaused(true);
         setControlsVisible((value) => {
           if (value) setToolboxOpen(false);
@@ -354,7 +409,8 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
           setCarouselPaused(true);
           return;
         }
-        touchStart.current = event.touches[0]?.clientX ?? null;
+        const touch = event.touches[0];
+        touchStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
       }}
       onTouchMove={(event) => {
         if (!pinchStart.current || event.touches.length !== 2) return;
@@ -369,8 +425,10 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
           return;
         }
         if (touchStart.current == null) return;
-        const distance = event.changedTouches[0].clientX - touchStart.current;
-        if (Math.abs(distance) > 45) move(distance > 0 ? -1 : 1);
+        const changed = event.changedTouches[0];
+        const distanceX = changed.clientX - touchStart.current.x;
+        const distanceY = changed.clientY - touchStart.current.y;
+        if (Math.abs(distanceX) > 45 && Math.abs(distanceX) > Math.abs(distanceY) * 1.25) move(distanceX > 0 ? -1 : 1);
         touchStart.current = null;
       }}
     >
@@ -380,6 +438,7 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
         ) : (
           <ImageSlide item={current} index={index} preview={preview} priority={priority} zoom={zoom} pan={pan} />
         )}
+        {!preview && controlsVisible && <span className={`posture-status posture-${shownOrientation}`} role="status" aria-live="polite">{orientationMode === 'auto' ? `Following device · ${shownOrientation}` : orientationMode === 'portrait' ? 'Stand posture · portrait' : 'Sleep posture · landscape'}</span>}
         {boundaryNotice && <div className="media-boundary-notice" role="status"><span>{boundaryNotice}</span><button type="button" onClick={(event) => { event.stopPropagation(); setBoundaryNotice(''); }} aria-label="Close movement message"><X size={16} /></button></div>}
         {media.length > 1 && (
           <>
@@ -396,11 +455,11 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
         {!preview && controlsVisible && toolboxOpen && (
           <div className="media-toolbox" onClick={(event) => event.stopPropagation()}>
             <header><strong>More options</strong><button type="button" onClick={() => setToolboxOpen(false)} aria-label="Close more options"><X size={18} /></button></header>
-            <button type="button" className={`media-fullscreen ${fullscreen ? 'active' : ''}`} onClick={toggleFullscreen} aria-label={fullscreen ? 'Exit full screen' : 'View media full screen'}><PictureScreenIcon expanded={fullscreen} /><span>{fullscreen ? 'Exit full screen' : 'Full screen'}</span></button>
+            <button type="button" className={`media-fullscreen ${mediaExpanded ? 'active' : ''}`} onClick={toggleFullscreen} aria-label={mediaExpanded ? 'Exit full screen' : 'View media full screen'}><PictureScreenIcon expanded={mediaExpanded} /><span>{mediaExpanded ? 'Exit full screen' : 'Full screen'}</span></button>
             <div className="orientation-control" aria-label="Choose post posture">
-              <button type="button" className={orientationMode === 'portrait' ? 'active' : ''} onClick={() => setOrientationMode('portrait')}><span className="posture-screen stand" /><b>Stand posture</b></button>
-              <button type="button" className={orientationMode === 'landscape' ? 'active' : ''} onClick={() => setOrientationMode('landscape')}><span className="posture-screen sleep" /><b>Sleep posture</b></button>
-              <button type="button" className={orientationMode === 'auto' ? 'active' : ''} onClick={() => setOrientationMode('auto')}><Smartphone size={18} /><b>Follow device</b></button>
+              <button type="button" className={orientationMode === 'portrait' ? 'active' : ''} onClick={() => applyOrientationMode('portrait')} aria-pressed={orientationMode === 'portrait'}><span className="posture-screen stand" /><b>Stand posture</b></button>
+              <button type="button" className={orientationMode === 'landscape' ? 'active' : ''} onClick={() => applyOrientationMode('landscape')} aria-pressed={orientationMode === 'landscape'}><span className="posture-screen sleep" /><b>Sleep posture</b></button>
+              <button type="button" className={orientationMode === 'auto' ? 'active' : ''} onClick={() => applyOrientationMode('auto')} aria-pressed={orientationMode === 'auto'}><Smartphone size={18} /><b>Follow device</b></button>
             </div>
             {current.type === 'video' ? (
               <button type="button" className={`media-sound ${muted ? 'muted' : 'sound-on'}`} onClick={() => setMuted((value) => !value)} aria-label={muted ? 'Turn sound on' : 'Mute video'} title={muted ? 'Turn sound on' : 'Mute video'}><DrumSoundIcon soundOn={!muted} /><span>{muted ? 'Sound off' : 'Sound on'}</span></button>

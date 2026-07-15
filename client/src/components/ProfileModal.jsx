@@ -305,7 +305,7 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
                   </button>
                 </div>
               </div>
-              {!isOwn && <button type="button" className={`profile-follow-click ${person.isFollowing ? 'following' : ''}`} onClick={() => onFollow(person)} aria-pressed={Boolean(person.isFollowing)}>Click me</button>}
+              {!isOwn && <button type="button" className={`profile-follow-click ${person.isFollowing ? 'following' : ''}`} onClick={() => onFollow(person)} aria-pressed={Boolean(person.isFollowing)} aria-label={person.isFollowing ? `Click me to stop being with ${person.name}` : `Click me to be with ${person.name}`}>Click me</button>}
               {person.bio && <p className="profile-bio">{person.bio}</p>}
             </>
           )}

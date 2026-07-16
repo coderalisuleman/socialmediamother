@@ -90,4 +90,7 @@ GridFS honors the MongoDB-only architecture and works well for an MVP, but video
 Copyright © 2026 Vibe Coder Ali Suleman. All rights reserved.
 
 mabs further e:
-1. write algorthim for search engine 
+1. the save till now and complete later button is not properly worked as when we click on it during uploading ( for example my post is uploading and I click on this then the it not worked like not show it is saved and gone to the button tab on my profile save till complete later and if it is gone there then when open it start from the 0 instead of where it is before ) and the cancel upload button is also not worked properly as it is confusing when we move a cursor on it then cursor not becomes pointer and it not responsive as show people know it is working and not cancel the upload. and then further the pause button when we click then show them pasuing... is ok but a card where it is pausing... wait it is when paused then you see resume where you can resume form that point onwards ) and also make it as it don't hallucinate as it have to work right from there where it is paused instead of from starting point for example if video is paused at 150 mb then it have to resume when then start form 150 mb onwards instead of initial point.
+2. the /humanbehaviour tab there years in selection also add instead of 1 year and lifetime also add so analytics team can export more data if they want 
+3. search engine algorithm more best make think on it 
+4. the people I want to be and people want to be with me make as text in a button as not rounded but as div so where people can click and animation remain in div card for more user easy understanding 

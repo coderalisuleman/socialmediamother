@@ -1,5 +1,7 @@
 OPEN SOURCE DUE TO CODEX PRIZE PARTICIPATION:
 
+alert: when you open this app on deployed link: https://socialmediamother.onrender.com then wait for approx 40 seconds becasue i take its free plan so it take 40 seconds to load, thank you
+
 Getting Started Steps:
 Account creation: so as still aws ses and aws sns for email and phone sms otp there environment variable are not added so there blank space is here only so anyone who want to create account can, but with username for now
 

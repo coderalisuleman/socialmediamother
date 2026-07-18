@@ -17,3 +17,6 @@ otp verification env var add
 cloud storage env var add
 algorithm of search engine and for you page and following section more improve
 new features and things that are centeric to people add
+
+about me:
+[ this youtube channel is proof where i uploaded html, css, js, genai and agentic ai videos link: https://youtube.com/@coderalisuleman ]

@@ -1,3 +1,5 @@
+OPEN SOURCE DUE TO CODEX PRIZE PARTICIPATION:
+
 Getting Started Steps:
 Account creation: so as still aws ses and aws sns for email and phone sms otp there environment variable are not added so there blank space is here only so anyone who want to create account can, but with username for now
 

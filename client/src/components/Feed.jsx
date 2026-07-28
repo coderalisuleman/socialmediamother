@@ -740,10 +740,16 @@ export function FeedSkeleton() {
 
 export function EmptyFeed({ following = false, onEveryone }) {
   return (
-    <div className="empty-state">
+    <div className={`empty-state ${following ? 'following-empty-state' : ''}`}>
       {!following && <span className="empty-orbit"><span>♡</span></span>}
       {!following && <h2>Nothing has been placed here yet.</h2>}
       {!following && <p>You can be the first person to share a thought.</p>}
+      {following && (
+        <div className="following-empty-copy">
+          <h2>You are not with anyone you want to see yet.</h2>
+          <p>The number of people you want to see is <strong>0</strong>. That is why there are no posts on this page.</p>
+        </div>
+      )}
       {following && <button type="button" className="primary-button" onClick={onEveryone}>See everyone</button>}
     </div>
   );

@@ -1,8 +1,25 @@
-export function relationshipAccordionLabel(direction, isOwn) {
-  if (direction === 'followers') {
-    return isOwn ? 'The people who want to see me' : 'The people who want to see them';
+function relationshipProfileReference(username) {
+  const normalizedUsername = String(username ?? '')
+    .trim()
+    .replace(/^@+/, '')
+    .trim();
+
+  return normalizedUsername ? `@${normalizedUsername}` : 'this person';
+}
+
+export function relationshipAccordionLabel(direction, username, isOwn = false) {
+  if (isOwn) {
+    return direction === 'followers'
+      ? 'The people who want to see me'
+      : 'The people I want to see';
   }
-  return isOwn ? 'The people I want to see' : 'The people they want to see';
+
+  const profileReference = relationshipProfileReference(username);
+
+  if (direction === 'followers') {
+    return `The people who want to see ${profileReference}`;
+  }
+  return `The people ${profileReference} wants to see`;
 }
 
 export function filterRelationshipPeople(people, query) {

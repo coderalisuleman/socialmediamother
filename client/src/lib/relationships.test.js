@@ -6,11 +6,41 @@ import {
   relationshipAccordionLabel,
 } from './relationships.js';
 
-test('uses the requested relationship labels for own and other profiles', () => {
-  assert.equal(relationshipAccordionLabel('followers', true), 'The people who want to see me');
-  assert.equal(relationshipAccordionLabel('following', true), 'The people I want to see');
-  assert.equal(relationshipAccordionLabel('followers', false), 'The people who want to see them');
-  assert.equal(relationshipAccordionLabel('following', false), 'The people they want to see');
+test('uses the viewed profile username in relationship labels', () => {
+  assert.equal(
+    relationshipAccordionLabel('followers', 'solomon'),
+    'The people who want to see @solomon',
+  );
+  assert.equal(
+    relationshipAccordionLabel('following', '@solomon'),
+    'The people @solomon wants to see',
+  );
+});
+
+test('keeps first-person relationship labels on the Me page', () => {
+  assert.equal(
+    relationshipAccordionLabel('followers', 'jasmine', true),
+    'The people who want to see me',
+  );
+  assert.equal(
+    relationshipAccordionLabel('following', 'jasmine', true),
+    'The people I want to see',
+  );
+});
+
+test('normalizes relationship usernames and falls back safely', () => {
+  assert.equal(
+    relationshipAccordionLabel('followers', '  @@jasmine  '),
+    'The people who want to see @jasmine',
+  );
+  assert.equal(
+    relationshipAccordionLabel('following', '  '),
+    'The people this person wants to see',
+  );
+  assert.equal(
+    relationshipAccordionLabel('followers'),
+    'The people who want to see this person',
+  );
 });
 
 test('filters relationship people by full name or @username', () => {

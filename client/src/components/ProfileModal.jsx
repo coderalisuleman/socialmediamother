@@ -473,7 +473,7 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
 
   const relationshipPanel = (direction) => {
     if (relationshipView !== direction) return null;
-    const label = relationshipAccordionLabel(direction, isOwn);
+    const label = relationshipAccordionLabel(direction, person.username, isOwn);
     const panelId = `relationship-${direction}-panel`;
     const triggerId = `relationship-${direction}-trigger`;
     const hasLoadedPeople = relationshipPeople.length > 0;
@@ -682,29 +682,30 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
               <div className="profile-relationship-accordions">
                 <section className={`relationship-accordion ${relationshipView === 'followers' ? 'open' : ''} ${!isOwn && person.isFollowing ? 'viewer-connected' : ''}`}>
                   <div className="relationship-control-row">
+                    {!isOwn ? (
+                      <button
+                        type="button"
+                        className="relationship-control-main relationship-follow-action"
+                        aria-pressed={Boolean(person.isFollowing)}
+                        aria-label={person.isFollowing
+                          ? `Stop being one of the people who want to see @${person.username}`
+                          : `Become one of the people who want to see @${person.username}`}
+                        onClick={() => onFollow(person)}
+                      >
+                        <span>{relationshipAccordionLabel('followers', person.username, isOwn)}</span>
+                        <strong className="relationship-count-box">{exactCount(person.followers)}</strong>
+                      </button>
+                    ) : (
+                      <div className="relationship-control-main relationship-control-label">
+                        <span>{relationshipAccordionLabel('followers', person.username, isOwn)}</span>
+                        <strong className="relationship-count-box">{exactCount(person.followers)}</strong>
+                      </div>
+                    )}
                     <button
                       id="relationship-followers-trigger"
                       type="button"
-                      className={`relationship-control-main ${!isOwn ? 'relationship-follow-action' : ''}`}
-                      {...(isOwn ? {
-                        'aria-expanded': relationshipView === 'followers',
-                        'aria-controls': 'relationship-followers-panel',
-                        onClick: () => toggleRelationships('followers'),
-                      } : {
-                        'aria-pressed': Boolean(person.isFollowing),
-                        'aria-label': person.isFollowing
-                          ? `Stop being one of the people who want to see ${person.name}`
-                          : `Become one of the people who want to see ${person.name}`,
-                        onClick: () => onFollow(person),
-                      })}
-                    >
-                      <span>{relationshipAccordionLabel('followers', isOwn)}</span>
-                      <strong className="relationship-count-box">{exactCount(person.followers)}</strong>
-                    </button>
-                    <button
-                      type="button"
                       className="relationship-expand-action"
-                      aria-label={`${relationshipView === 'followers' ? 'Hide' : 'Show'} ${relationshipAccordionLabel('followers', isOwn).toLowerCase()}`}
+                      aria-label={`${relationshipView === 'followers' ? 'Hide' : 'Show'} ${relationshipAccordionLabel('followers', person.username, isOwn).toLowerCase()}`}
                       aria-expanded={relationshipView === 'followers'}
                       aria-controls="relationship-followers-panel"
                       onClick={() => toggleRelationships('followers')}
@@ -717,21 +718,15 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
 
                 <section className={`relationship-accordion ${relationshipView === 'following' ? 'open' : ''}`}>
                   <div className="relationship-control-row">
+                    <div className="relationship-control-main relationship-control-label">
+                      <span>{relationshipAccordionLabel('following', person.username, isOwn)}</span>
+                      <strong className="relationship-count-box">{exactCount(person.following)}</strong>
+                    </div>
                     <button
                       id="relationship-following-trigger"
                       type="button"
-                      className="relationship-control-main"
-                      aria-expanded={relationshipView === 'following'}
-                      aria-controls="relationship-following-panel"
-                      onClick={() => toggleRelationships('following')}
-                    >
-                      <span>{relationshipAccordionLabel('following', isOwn)}</span>
-                      <strong className="relationship-count-box">{exactCount(person.following)}</strong>
-                    </button>
-                    <button
-                      type="button"
                       className="relationship-expand-action"
-                      aria-label={`${relationshipView === 'following' ? 'Hide' : 'Show'} ${relationshipAccordionLabel('following', isOwn).toLowerCase()}`}
+                      aria-label={`${relationshipView === 'following' ? 'Hide' : 'Show'} ${relationshipAccordionLabel('following', person.username, isOwn).toLowerCase()}`}
                       aria-expanded={relationshipView === 'following'}
                       aria-controls="relationship-following-panel"
                       onClick={() => toggleRelationships('following')}

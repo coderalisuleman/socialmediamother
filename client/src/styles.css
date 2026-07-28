@@ -5814,7 +5814,6 @@ body.top-navigation-hidden .right-rail { top: 24px; }
 .relationship-control-main,
 .relationship-expand-action {
   color: var(--teal-dark);
-  cursor: pointer;
 }
 
 .relationship-control-main {
@@ -5841,6 +5840,16 @@ body.top-navigation-hidden .right-rail { top: 24px; }
   font-size: clamp(1rem, 2vw, 1.12rem);
   font-weight: 900;
   line-height: 1.35;
+}
+
+.relationship-control-label {
+  cursor: default;
+  user-select: none;
+}
+
+.relationship-follow-action,
+.relationship-expand-action {
+  cursor: pointer;
 }
 
 .relationship-control-main > .relationship-count-box {
@@ -5889,7 +5898,7 @@ body.top-navigation-hidden .right-rail { top: 24px; }
   transform: rotate(180deg);
 }
 
-.relationship-control-main:hover {
+.relationship-follow-action:hover {
   border-color: #315f70;
   background: #e6f5f8;
   box-shadow:
@@ -5907,13 +5916,13 @@ body.top-navigation-hidden .right-rail { top: 24px; }
   transform: translateY(-2px);
 }
 
-.relationship-control-main:active,
+.relationship-follow-action:active,
 .relationship-expand-action:active {
   box-shadow: 0 2px 0 rgba(46, 82, 94, .2);
   transform: translateY(2px);
 }
 
-.relationship-control-main:focus-visible,
+.relationship-follow-action:focus-visible,
 .relationship-expand-action:focus-visible,
 .relationship-person-list button:focus-visible,
 .relationship-load-more:focus-visible,

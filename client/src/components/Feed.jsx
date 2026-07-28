@@ -742,9 +742,9 @@ export function FeedSkeleton() {
 export function EmptyFeed({ following = false, onEveryone }) {
   return (
     <div className="empty-state">
-      <span className="empty-orbit"><span>♡</span></span>
-      <h2>{following ? 'Your circle is still a quiet room.' : 'Nothing has been placed here yet.'}</h2>
-      <p>{following ? 'Be with a few people and their posts will gather here. Until then, everyone is just next door.' : 'You can be the first person to share a thought.'}</p>
+      {!following && <span className="empty-orbit"><span>♡</span></span>}
+      {!following && <h2>Nothing has been placed here yet.</h2>}
+      {!following && <p>You can be the first person to share a thought.</p>}
       {following && <button type="button" className="primary-button" onClick={onEveryone}>See everyone</button>}
     </div>
   );

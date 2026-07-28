@@ -699,7 +699,7 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
                       })}
                     >
                       <span>{relationshipAccordionLabel('followers', isOwn)}</span>
-                      <strong>{exactCount(person.followers)}</strong>
+                      <strong className="relationship-count-box">{exactCount(person.followers)}</strong>
                     </button>
                     <button
                       type="button"
@@ -726,7 +726,7 @@ export default function ProfilePage({ person, isOwn, startEditing = false, onAva
                       onClick={() => toggleRelationships('following')}
                     >
                       <span>{relationshipAccordionLabel('following', isOwn)}</span>
-                      <strong>{exactCount(person.following)}</strong>
+                      <strong className="relationship-count-box">{exactCount(person.following)}</strong>
                     </button>
                     <button
                       type="button"

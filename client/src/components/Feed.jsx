@@ -196,15 +196,14 @@ function VideoSlide({ item, active, inView, controlsVisible, analyticsContext, m
         onError={() => setStatus('error')}
       />
       {status === 'loading' && <MediaLoading kind={analyticsContext?.format === 'short-video' ? 'short-video' : 'video'} />}
-      {status === 'error' && <AssetError message={offline ? 'This part was not buffered before you went offline.' : 'This video could not be loaded.'} helpText={offline ? 'You can watch the part already buffered. Reconnect to continue beyond it.' : undefined} onRetry={() => { setStatus('loading'); setRetryKey((value) => value + 1); }} />}
-      {controlsVisible && status === 'ready' && duration > 0 && <span className={`media-buffer-status ${offline ? 'is-offline' : ''}`} role="status">{offline ? (bufferedUntil > currentTime ? `Offline · buffered through ${formatMediaTime(bufferedUntil)}` : 'Offline · more video needs internet') : `Buffered ahead ${bufferedPercent}%`}</span>}
+      {status === 'error' && <AssetError message={offline ? 'This part is unavailable while you are offline.' : 'This video could not be loaded.'} helpText={offline ? 'Reconnect to continue watching.' : undefined} onRetry={() => { setStatus('loading'); setRetryKey((value) => value + 1); }} />}
       {controlsVisible && status !== 'error' && <button type="button" className="media-play" onClick={(event) => { event.stopPropagation(); setPaused((value) => !value); }} aria-label={paused ? 'Play video' : 'Stop video'}>
         {paused ? <Play size={22} fill="currentColor" /> : <Square size={20} fill="currentColor" />}
       </button>}
       {controlsVisible && status !== 'error' && (
         <div className="video-time-controls" onClick={(event) => event.stopPropagation()}>
           <div className="video-time-readout"><strong>{formatMediaTime(currentTime)}</strong><span>of</span><strong>{formatMediaTime(duration)}</strong></div>
-          <div className="film-progress-explanation"><span className="watched-key"><i />Watched {watchedPercent}%</span><span className="buffered-key"><i />Buffered {bufferedPercent}%</span><span className="left-key"><i />Left {100 - watchedPercent}%</span></div>
+          <div className="film-progress-explanation"><span className="watched-key"><i />Watched {watchedPercent}%</span><span className="left-key"><i />Left {100 - watchedPercent}%</span></div>
           <div className={`camera-film-timeline ${paused ? 'is-paused' : ''}`} style={{ '--film-progress': `${watchedPercent}%`, '--buffered-progress': `${bufferedPercent}%` }}>
             <span className="film-camera" aria-hidden="true"><CameraFilmIcon /></span>
             <span className="film-strip" aria-hidden="true">

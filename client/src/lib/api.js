@@ -99,6 +99,10 @@ function uploadRequest(path, { body, timeout = 10 * 60_000, onUploadProgress } =
 }
 
 const cancelledUploadError = () => Object.assign(new ApiError('The upload was cancelled.'), { cancelled: true });
+const savedUploadError = (uploadCheckpoint) => Object.assign(new ApiError('The upload was saved for later.'), {
+  saved: true,
+  uploadCheckpoint,
+});
 
 function uploadChunk(path, blob, { onProgress, setRequest }) {
   return new Promise((resolve, reject) => {
@@ -125,18 +129,56 @@ function uploadChunk(path, blob, { onProgress, setRequest }) {
   });
 }
 
-async function resumablePostRequest(formData, { onUploadProgress, onUploadControl, onUploadState } = {}) {
+function matchingUploadFiles(files, sessionFiles) {
+  return files.length === sessionFiles.length && files.every((file, index) => {
+    const saved = sessionFiles[index];
+    return file.name === saved?.name && file.type === saved?.type && file.size === Number(saved?.size);
+  });
+}
+
+function uploadedSessionBytes(session, chunkSize) {
+  return (session?.files || []).reduce((total, file) => total + (file.receivedChunks || []).reduce((sum, chunkIndex) => (
+    sum + Math.min(chunkSize, Number(file.size) - Number(chunkIndex) * chunkSize)
+  ), 0), 0);
+}
+
+async function resumablePostRequest(formData, { onUploadProgress, onUploadControl, onUploadState, resumeSession } = {}) {
   const files = formData.getAll('files').filter((item) => item instanceof File);
   if (!files.length) return uploadRequest('/posts', { body: formData, onUploadProgress });
 
   let paused = false;
   let cancelled = false;
+  let saveRequested = false;
+  let stoppedForSave = false;
   let currentRequest = null;
   let sessionId = null;
+  let sessionInfo = null;
   let resumeUpload = null;
+  let saveWaiters = [];
   const startedAt = performance.now();
   const totalBytes = files.reduce((total, file) => total + file.size, 0);
   let committedBytes = 0;
+  let startingBytes = 0;
+  let completing = false;
+
+  const checkpoint = () => ({
+    sessionId,
+    uploadedBytes: committedBytes,
+    totalBytes,
+    percent: totalBytes ? Math.round((committedBytes / totalBytes) * 100) : 0,
+    expiresAt: sessionInfo?.expiresAt || null,
+    savedAt: new Date().toISOString(),
+  });
+
+  const finishSaveRequest = () => {
+    if (stoppedForSave || !sessionId) return null;
+    stoppedForSave = true;
+    const value = checkpoint();
+    onUploadState?.('saved');
+    saveWaiters.forEach(({ resolve }) => resolve(value));
+    saveWaiters = [];
+    return value;
+  };
 
   const controls = {
     pause() {
@@ -145,7 +187,7 @@ async function resumablePostRequest(formData, { onUploadProgress, onUploadContro
       onUploadState?.('pausing');
     },
     resume() {
-      if (cancelled || !paused) return;
+      if (cancelled || saveRequested || !paused) return;
       paused = false;
       onUploadState?.('uploading');
       resumeUpload?.();
@@ -158,39 +200,70 @@ async function resumablePostRequest(formData, { onUploadProgress, onUploadContro
       currentRequest?.abort();
       resumeUpload?.();
       resumeUpload = null;
-      onUploadState?.('cancelled');
+      onUploadState?.('cancelling');
+    },
+    saveForLater() {
+      if (cancelled) return Promise.reject(cancelledUploadError());
+      if (stoppedForSave) return Promise.resolve(checkpoint());
+      saveRequested = true;
+      paused = true;
+      onUploadState?.(currentRequest ? 'pausing' : 'paused');
+      const promise = new Promise((resolve, reject) => { saveWaiters.push({ resolve, reject }); });
+      resumeUpload?.();
+      resumeUpload = null;
+      if (sessionId && !currentRequest) finishSaveRequest();
+      return promise;
     },
   };
   onUploadControl?.(controls);
 
   const waitWhilePaused = async () => {
+    if (saveRequested) throw savedUploadError(finishSaveRequest() || checkpoint());
     if (!paused) return;
     onUploadState?.('paused');
     await new Promise((resolve) => { resumeUpload = resolve; });
     if (cancelled) throw cancelledUploadError();
+    if (saveRequested) throw savedUploadError(finishSaveRequest() || checkpoint());
   };
 
   const emitProgress = (loaded) => {
     const progress = calculateUploadProgress(loaded, totalBytes, performance.now() - startedAt);
+    const elapsedSeconds = Math.max(0.001, (performance.now() - startedAt) / 1000);
+    progress.bytesPerSecond = Math.max(0, loaded - startingBytes) / elapsedSeconds;
+    progress.remainingSeconds = progress.bytesPerSecond > 0 && totalBytes > loaded
+      ? (totalBytes - loaded) / progress.bytesPerSecond
+      : progress.percent >= 100 ? 0 : null;
     if (paused && progress.status === 'uploading') progress.status = 'pausing';
     onUploadProgress?.(progress);
   };
 
   try {
-    const created = await request('/uploads/sessions', {
-      method: 'POST',
-      body: JSON.stringify({ files: files.map((file) => ({ name: file.name, type: file.type, size: file.size })) }),
-      timeout: 30_000,
-    });
-    sessionId = created?.session?.id;
-    const chunkSize = Number(created?.session?.chunkSize || 2 * 1024 * 1024);
+    const response = resumeSession?.sessionId
+      ? await request(`/uploads/sessions/${encodeURIComponent(resumeSession.sessionId)}`, { timeout: 30_000 })
+      : await request('/uploads/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ files: files.map((file) => ({ name: file.name, type: file.type, size: file.size })) }),
+        timeout: 30_000,
+      });
+    sessionInfo = response?.session;
+    sessionId = sessionInfo?.id;
+    const chunkSize = Number(sessionInfo?.chunkSize || 2 * 1024 * 1024);
     if (!sessionId) throw new ApiError('The resumable upload could not be started.');
+    if (!matchingUploadFiles(files, sessionInfo?.files || [])) {
+      throw new ApiError('The selected files no longer match this saved upload. The saved progress was not changed.');
+    }
+    const receivedByFile = (sessionInfo.files || []).map((file) => new Set((file.receivedChunks || []).map(Number)));
+    committedBytes = uploadedSessionBytes(sessionInfo, chunkSize);
+    startingBytes = committedBytes;
+    emitProgress(committedBytes);
+    if (saveRequested) throw savedUploadError(finishSaveRequest() || checkpoint());
     if (cancelled) throw cancelledUploadError();
 
     for (let fileIndex = 0; fileIndex < files.length; fileIndex += 1) {
       const file = files[fileIndex];
       const totalChunks = Math.ceil(file.size / chunkSize);
       for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+        if (receivedByFile[fileIndex]?.has(chunkIndex)) continue;
         await waitWhilePaused();
         if (cancelled) throw cancelledUploadError();
         const start = chunkIndex * chunkSize;
@@ -205,11 +278,14 @@ async function resumablePostRequest(formData, { onUploadProgress, onUploadContro
         );
         currentRequest = null;
         committedBytes += piece.size;
+        receivedByFile[fileIndex]?.add(chunkIndex);
         emitProgress(committedBytes);
+        if (saveRequested) throw savedUploadError(finishSaveRequest() || checkpoint());
       }
     }
 
     onUploadState?.('processing');
+    completing = true;
     const body = {};
     for (const [key, value] of formData.entries()) {
       if (key !== 'files' && typeof value === 'string') body[key] = value;
@@ -220,13 +296,27 @@ async function resumablePostRequest(formData, { onUploadProgress, onUploadContro
       timeout: 10 * 60_000,
     });
   } catch (error) {
-    if (sessionId) {
-      await request(`/uploads/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE', timeout: 30_000 }).catch(() => {});
+    if (cancelled || error?.cancelled) {
+      if (sessionId) {
+        await request(`/uploads/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE', timeout: 30_000 }).catch(() => {});
+      }
+      onUploadState?.('cancelled');
+      throw cancelledUploadError();
     }
-    if (cancelled || error?.cancelled) throw cancelledUploadError();
+    if (error?.saved || stoppedForSave) {
+      throw savedUploadError(error?.uploadCheckpoint || checkpoint());
+    }
+    if (!completing && sessionId && error && !error.uploadCheckpoint) {
+      error.uploadCheckpoint = checkpoint();
+    }
     throw error;
   } finally {
     currentRequest = null;
+    if (saveWaiters.length) {
+      const error = new ApiError('The upload could not be saved at a safe stopping point.');
+      saveWaiters.forEach(({ reject }) => reject(error));
+      saveWaiters = [];
+    }
     onUploadControl?.(null);
   }
 }
@@ -246,6 +336,7 @@ export const api = {
   getUser: async (username) => normalizeUserShape((await request(`/users/${encodeURIComponent(String(username).replace(/^@/, ''))}`))?.user),
   search: async (params) => normalizeSearchResponse(await request(`/search${queryString(params)}`)),
   createPost: (formData, options = {}) => resumablePostRequest(formData, options),
+  cancelUploadSession: (sessionId) => request(`/uploads/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE', timeout: 30_000 }),
   deletePost: (postId) => request(`/posts/${encodeURIComponent(postId)}`, { method: 'DELETE' }),
   reactToPost: (postId, reaction) =>
     request(`/posts/${postId}/reaction`, { method: 'PUT', body: JSON.stringify({ reaction }) }),
@@ -282,7 +373,7 @@ export const api = {
   },
   creatorAnalytics: ({ days = 30, lifetime = false } = {}) => request(`/analytics/creator/report${queryString({ days: lifetime ? null : days, lifetime: lifetime ? 'true' : null })}`),
   analyticsTeamLogin: (email, password) => request('/analytics/team/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
-  analyticsTeamReport: (token, days = 7) => request(`/analytics/team/report${queryString({ days })}`, { headers: { Authorization: `Bearer ${token}` } }),
+  analyticsTeamReport: (token, { days = 7, lifetime = false } = {}) => request(`/analytics/team/report${queryString({ days: lifetime ? null : days, lifetime: lifetime ? 'true' : null })}`, { headers: { Authorization: `Bearer ${token}` } }),
 };
 
 function exactNumericCount(value) {

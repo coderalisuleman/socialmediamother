@@ -7,7 +7,27 @@ const filters = ['all', 'people', 'text', 'photo', 'video', 'short-video'];
 const contentTypeLabels = { all: 'All', people: 'People', text: 'Text', photo: 'Photo', video: 'Video', 'short-video': 'Short video' };
 
 function normalize(value) {
-  return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function closeTokenMatch(token, haystack) {
+  const words = normalize(haystack).split(/[^a-z0-9]+/).filter(Boolean);
+  return words.some((word) => {
+    if (word === token || word.startsWith(token) || (token.length >= 3 && word.includes(token))) return true;
+    if (token.length < 4 || Math.abs(word.length - token.length) > 1) return false;
+    let mismatches = 0;
+    for (let index = 0; index < Math.max(word.length, token.length); index += 1) {
+      if (word[index] !== token[index]) mismatches += 1;
+    }
+    if (mismatches <= 1) return true;
+    const mismatchIndexes = token.length === word.length
+      ? [...token].flatMap((character, index) => character === word[index] ? [] : [index])
+      : [];
+    return mismatchIndexes.length === 2
+      && mismatchIndexes[1] === mismatchIndexes[0] + 1
+      && token[mismatchIndexes[0]] === word[mismatchIndexes[1]]
+      && token[mismatchIndexes[1]] === word[mismatchIndexes[0]];
+  });
 }
 
 function scorePerson(person, query) {
@@ -42,7 +62,9 @@ function scorePost(post, query) {
   ].filter(Boolean).join(' '));
   const contentQuery = q.replace(/\bby\s+@?[a-z]{1,40}(?=\s|$)/g, '').replace(/@[a-z]{1,40}/g, '').trim();
   const contentTokens = contentQuery.split(/[^a-z0-9]+/).filter(Boolean);
-  if (contentTokens.length && !contentTokens.every((token) => haystack.includes(token))) return 0;
+  const matchedTokens = contentTokens.filter((token) => closeTokenMatch(token, haystack));
+  const requiredMatches = contentTokens.length <= 2 ? contentTokens.length : Math.ceil(contentTokens.length * .6);
+  if (contentTokens.length && matchedTokens.length < requiredMatches) return 0;
   let score = 0;
   if (q.includes(`by @${username}`)) score += 1200;
   else if (q.includes(`@${username}`)) score += 900;
@@ -51,8 +73,8 @@ function scorePost(post, query) {
   if (title && q.includes(title)) score += 420;
   if (title && title.includes(q)) score += 300;
   q.split(/[^a-z0-9@]+/).filter((token) => token !== 'by').forEach((token) => {
-    if (haystack.includes(token)) score += 55;
-    if (title.includes(token)) score += 50;
+    if (closeTokenMatch(token, haystack)) score += 55;
+    if (closeTokenMatch(token, title)) score += 50;
   });
   score += Math.log10(Number(post.hugs || 0) + 1) * 2;
   return score;

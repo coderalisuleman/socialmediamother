@@ -28,6 +28,18 @@ export const cleanPhone = (value) => {
   return phone;
 };
 
+export const cleanLoginIdentifier = (value, expectedMethod) => {
+  const identifier = String(value || '').trim();
+  if (!identifier) {
+    throw new AppError(422, 'Phone number or email is required', 'IDENTIFIER_REQUIRED');
+  }
+  const method = expectedMethod
+    || (identifier.startsWith('+') ? 'phone' : identifier.includes('@') && !identifier.startsWith('@') ? 'email' : null);
+  if (method === 'phone') return cleanPhone(identifier);
+  if (method === 'email') return cleanEmail(identifier);
+  throw new AppError(422, 'Use the phone number or email connected to your account', 'PHONE_OR_EMAIL_REQUIRED');
+};
+
 export const cleanLinks = (value) => {
   if (!value) return [];
   let links = value;

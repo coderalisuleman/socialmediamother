@@ -35,7 +35,7 @@ export const publicPost = (post, { viewerReaction = null, viewerFollowsAuthor = 
   links: post.links || [],
   media: (post.media || []).map((item, index) => ({
     fileId: item.fileId ? String(item.fileId) : null,
-    url: item.fileId ? fileUrl(item.fileId) : item.url || null,
+    url: item.url || (item.fileId ? fileUrl(item.fileId) : null),
     filename: item.filename,
     contentType: item.contentType,
     size: Number(item.size || 0),

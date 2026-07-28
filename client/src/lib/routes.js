@@ -14,6 +14,7 @@ const UPLOAD_SLUG_TO_MODE = Object.fromEntries(
 // These names belong to the platform itself, so they are never interpreted as profiles.
 export const RESERVED_TOP_LEVEL_PATHS = new Set([
   'accountin',
+  'analytics',
   'api',
   'assets',
   'brand',
@@ -107,7 +108,7 @@ export function parseAppLocation(location = window.location) {
   if (!segments.length) return { kind: query ? 'search' : 'home', query };
   if (segments.length === 1 && segments[0] === 'createaccount') return { kind: 'create-account' };
   if (segments.length === 1 && segments[0] === 'accountin') return { kind: 'account-in' };
-  if (segments.length === 1 && segments[0] === 'humanbehaviour') return { kind: 'human-behaviour' };
+  if (segments.length === 1 && segments[0] === 'analytics') return { kind: 'human-behaviour' };
   if (segments[0] === 'search') return { kind: 'search', query: query || null };
 
   if (segments[0] === 'feed' && segments.length === 2 && ['everyone', 'following'].includes(segments[1])) {

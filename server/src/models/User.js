@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, unique: true, sparse: true, trim: true },
   verifiedEmail: { type: Boolean, default: false },
   verifiedPhone: { type: Boolean, default: false },
-  gender: { type: String, enum: ['female', 'male', 'other', 'prefer-not-to-say'], default: 'prefer-not-to-say' },
+  gender: { type: String, enum: ['female', 'male', 'transgender', 'other', 'prefer-not-to-say'], default: 'prefer-not-to-say' },
   bio: { type: String, trim: true, maxlength: 500, default: '' },
   profileImageFileId: { type: mongoose.Schema.Types.ObjectId, default: null },
   followerCount: { type: Number, min: 0, default: 0 },

@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { AlignLeft, ArrowDownToLine, ArrowLeft, Ban, CheckCircle2, Film, Image as ImageIcon, Link2, LoaderCircle, Pause, Play, Plus, Save, Smartphone, UploadCloud, Video } from 'lucide-react';
+import { AlignLeft, ArrowDownToLine, ArrowLeft, CheckCircle2, Film, Image as ImageIcon, Link2, LoaderCircle, Pause, Play, Plus, Save, Smartphone, UploadCloud, Video, X } from 'lucide-react';
 import { useObjectUrls } from '../lib/hooks';
 import { optimizePhoto } from '../lib/media';
 import { formatBytes, formatRemainingTime } from '../lib/uploadProgress';
@@ -14,16 +14,28 @@ const choices = [
   { id: 'short-video', label: 'Short video', detail: 'Vertical, quick and in motion', icon: Smartphone },
 ];
 
+function toLinkFields(value) {
+  const source = Array.isArray(value) ? value : String(value || '').split(/[\n,]+/);
+  const links = source.map((item) => String(item || '').trim()).filter(Boolean);
+  return links.length ? links : [''];
+}
+
 function UploadProgress({ progress }) {
   if (!progress) return null;
   const failed = progress.status === 'failed';
   const cancelled = progress.status === 'cancelled';
   const paused = progress.status === 'paused';
   const pausing = progress.status === 'pausing';
+  const saved = progress.status === 'saved';
+  const cancelling = progress.status === 'cancelling';
   const processing = progress.status === 'processing';
   const remainingBytes = Math.max(0, progress.total - progress.loaded);
   const timeLabel = cancelled
     ? 'Cancelled — your form and selected files are still here'
+    : cancelling
+      ? 'Cancelling safely and removing the private upload pieces…'
+      : saved
+        ? 'Saved privately — resume from this point in your Me page'
     : paused
       ? 'Paused — choose resume whenever you are ready'
       : pausing
@@ -37,9 +49,9 @@ function UploadProgress({ progress }) {
         : `${formatRemainingTime(progress.remainingSeconds)} left`;
 
   return (
-    <section className={`upload-progress-card ${failed ? 'failed' : ''} ${cancelled ? 'cancelled' : ''} ${paused || pausing ? 'paused' : ''}`} aria-live="polite">
+    <section className={`upload-progress-card ${failed ? 'failed' : ''} ${cancelled ? 'cancelled' : ''} ${paused || pausing || saved ? 'paused' : ''} ${cancelling ? 'cancelling' : ''}`} aria-live="polite">
       <div className="upload-progress-head">
-        <span><UploadCloud size={19} /><strong>{cancelled ? 'Upload cancelled' : paused ? 'Upload paused' : pausing ? 'Pausing upload' : failed ? 'Upload stopped' : processing ? 'Finishing your post' : 'Uploading your post'}</strong></span>
+        <span><UploadCloud size={19} /><strong>{cancelled ? 'Upload cancelled' : cancelling ? 'Cancelling upload' : saved ? 'Saved to complete later' : paused ? 'Upload paused' : pausing ? 'Pausing upload' : failed ? 'Upload stopped' : processing ? 'Finishing your post' : 'Uploading your post'}</strong></span>
         <b>{progress.percent}%</b>
       </div>
       <div
@@ -123,6 +135,12 @@ const DropField = memo(function DropField({ mode, files, setFiles }) {
         multiple
         onChange={(event) => add(event.target.files)}
       />
+      {(mode === 'video' || mode === 'short-video') && (
+        <p className="video-aspect-note" role="note">
+          <strong>{mode === 'short-video' ? '9:16 short-video frame' : '16:9 video frame'}</strong>
+          <span>Other video shapes are automatically fitted inside this frame without cropping the picture.</span>
+        </p>
+      )}
       {optimizing && <p className="file-optimizing" role="status"><LoaderCircle className="spin" size={16} /> Compressing photos for a faster post…</p>}
       {files.length > 0 && (
         <div className="selected-files">
@@ -150,12 +168,13 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
   const [mode, setMode] = useState(null);
   const [name, setName] = useState('');
   const [detail, setDetail] = useState('');
-  const [link, setLink] = useState('');
+  const [links, setLinks] = useState(['']);
   const [text, setText] = useState('');
   const [files, setFiles] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [uploadControl, setUploadControl] = useState(null);
+  const [uploadCheckpoint, setUploadCheckpoint] = useState(null);
   const [draftId, setDraftId] = useState(null);
   const [draftSaving, setDraftSaving] = useState(false);
   const [discardConfirm, setDiscardConfirm] = useState(false);
@@ -167,12 +186,13 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
     setMode(null);
     setName('');
     setDetail('');
-    setLink('');
+    setLinks(['']);
     setText('');
     setFiles([]);
     setSubmitting(false);
     setUploadProgress(null);
     setUploadControl(null);
+    setUploadCheckpoint(null);
     setDraftId(null);
     setDraftSaving(false);
     setError('');
@@ -185,10 +205,20 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
       setMode(initialDraft.type || initialMode || null);
       setName(initialDraft.name || '');
       setDetail(initialDraft.detail || '');
-      setLink(initialDraft.link || '');
+      setLinks(toLinkFields(initialDraft.links || initialDraft.link));
       setText(initialDraft.text || '');
       setFiles(Array.isArray(initialDraft.files) ? initialDraft.files : []);
       setDraftId(initialDraft.id || null);
+      const checkpoint = initialDraft.uploadCheckpoint || null;
+      setUploadCheckpoint(checkpoint);
+      setUploadProgress(checkpoint ? {
+        loaded: Number(checkpoint.uploadedBytes || 0),
+        total: Number(checkpoint.totalBytes || 0),
+        percent: Number(checkpoint.percent || 0),
+        bytesPerSecond: 0,
+        remainingSeconds: null,
+        status: 'saved',
+      } : null);
       return;
     }
     setMode(initialMode || null);
@@ -199,15 +229,16 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
       onDirtyChange?.(false);
       return;
     }
-    const dirty = Boolean(mode && (text || name || detail || link || files.length));
+    const dirty = Boolean(mode && (text || name || detail || links.some((item) => item.trim()) || files.length));
     onDirtyChange?.(dirty);
-  }, [detail, files.length, link, mode, name, onDirtyChange, open, text]);
+  }, [detail, files.length, links, mode, name, onDirtyChange, open, text]);
 
   const chooseMode = (nextMode) => {
     setMode(nextMode);
     setFiles([]);
     setUploadProgress(null);
     setUploadControl(null);
+    setUploadCheckpoint(null);
     setError('');
     onModeChange?.(nextMode);
   };
@@ -216,11 +247,12 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
     setMode(null);
     setName('');
     setDetail('');
-    setLink('');
+    setLinks(['']);
     setText('');
     setFiles([]);
     setUploadProgress(null);
     setUploadControl(null);
+    setUploadCheckpoint(null);
     setDraftId(null);
     setDraftSaving(false);
     setError('');
@@ -233,19 +265,22 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
   };
 
   const saveDraft = async () => {
-    if (!mode || draftSaving || submitting) return;
+    if (!mode || draftSaving || (submitting && !uploadControl?.saveForLater)) return;
     setDraftSaving(true);
     setError('');
     try {
+      const checkpoint = submitting ? await uploadControl.saveForLater() : uploadCheckpoint;
+      if (checkpoint) setUploadCheckpoint(checkpoint);
       const saved = await savePostDraft({
         id: draftId,
         ownerUsername,
         type: mode,
         name,
         detail,
-        link,
+        link: links.join('\n'),
         text,
         files,
+        uploadCheckpoint: checkpoint || null,
       });
       setDraftId(saved.id);
       onDirtyChange?.(false);
@@ -256,6 +291,14 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
       setError(draftError.message || 'This draft could not be saved on your device.');
     } finally {
       setDraftSaving(false);
+    }
+  };
+
+  const changeFiles = (nextFiles) => {
+    setFiles(nextFiles);
+    if (uploadCheckpoint) {
+      setUploadCheckpoint(null);
+      setUploadProgress(null);
     }
   };
 
@@ -272,7 +315,7 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
   };
 
   const goBack = () => {
-    const hasWork = Boolean(text || name || detail || link || files.length);
+    const hasWork = Boolean(text || name || detail || links.some((item) => item.trim()) || files.length);
     if (hasWork) {
       setDiscardConfirm(true);
       return;
@@ -293,10 +336,11 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
     if (mode !== 'text' && !name.trim()) return setError('Please give this post a name.');
     if (mode !== 'text' && !files.length) return setError(`Choose at least one ${mode === 'photo' ? 'photo' : 'video'}.`);
     const totalFileBytes = files.reduce((total, file) => total + Number(file.size || 0), 0);
+    const startingBytes = Number(uploadCheckpoint?.uploadedBytes || 0);
     setUploadProgress(mode === 'text' ? null : {
-      loaded: 0,
+      loaded: startingBytes,
       total: totalFileBytes,
-      percent: 0,
+      percent: totalFileBytes ? Math.round((startingBytes / totalFileBytes) * 100) : 0,
       bytesPerSecond: 0,
       remainingSeconds: null,
       status: 'uploading',
@@ -308,17 +352,26 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
         type: mode,
         name: mode === 'text' ? cleanText.split(/\n/)[0].slice(0, 120) : name.trim(),
         detail: mode === 'text' ? '' : detail.trim(),
-        links: mode === 'text' ? [] : link.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean),
+        links: mode === 'text' ? [] : links.map((item) => item.trim()).filter(Boolean),
         text: cleanText,
         files,
+        uploadCheckpoint,
       }, setUploadProgress, setUploadControl, (status) => setUploadProgress((current) => current ? { ...current, status } : current));
       if (draftId) await deletePostDraft(draftId).catch(() => {});
       onDirtyChange?.(false);
       reset();
       onClose();
     } catch (submitError) {
-      setUploadProgress((current) => current ? { ...current, status: submitError?.cancelled ? 'cancelled' : 'failed' } : null);
-      setError(submitError?.cancelled ? '' : submitError.message || 'This post could not be shared. Please try again.');
+      if (submitError?.uploadCheckpoint) setUploadCheckpoint(submitError.uploadCheckpoint);
+      setUploadProgress((current) => current ? {
+        ...current,
+        ...(submitError?.uploadCheckpoint ? {
+          loaded: Number(submitError.uploadCheckpoint.uploadedBytes || current.loaded),
+          percent: Number(submitError.uploadCheckpoint.percent || current.percent),
+        } : {}),
+        status: submitError?.saved ? 'saved' : submitError?.cancelled ? 'cancelled' : 'failed',
+      } : null);
+      setError(submitError?.cancelled || submitError?.saved ? '' : submitError.message || 'This post could not be shared. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -358,7 +411,7 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
               </button>
             </div>
           ) : (
-            <DropField mode={mode} files={files} setFiles={setFiles} />
+            <DropField mode={mode} files={files} setFiles={changeFiles} />
           )}
 
           {mode !== 'text' && (
@@ -371,29 +424,62 @@ export default function UploadModal({ open, onClose, onCreate, initialMode = nul
                 <span>Detail it <em>optional</em></span>
                 <textarea value={detail} onChange={(event) => setDetail(event.target.value)} rows="3" maxLength="600" placeholder="A little context, a story, a credit…" />
               </label>
-              <label>
-                <span><Link2 size={14} /> Links to your other platforms <em>optional</em></span>
-                <textarea value={link} onChange={(event) => setLink(event.target.value)} rows="2" placeholder="One URL per line, or separate them with commas" />
-              </label>
+              <section className="platform-links-field" aria-labelledby="platform-links-heading">
+                <div id="platform-links-heading" className="section-label platform-links-heading">
+                  <Link2 size={20} /> Links to your other platforms <em>optional</em>
+                </div>
+                <div className="platform-link-inputs">
+                  {links.map((value, index) => (
+                    <div className="platform-link-row" key={index}>
+                      <label>
+                        <span>Link {index + 1}</span>
+                        <input
+                          type="text"
+                          inputMode="url"
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          value={value}
+                          onChange={(event) => setLinks((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
+                          placeholder="https://example.com/your-page"
+                        />
+                      </label>
+                      {links.length > 1 && (
+                        <button
+                          type="button"
+                          className="platform-link-remove"
+                          onClick={() => setLinks((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                          aria-label={`Remove link ${index + 1}`}
+                        >
+                          <X size={18} /> Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button type="button" className="add-another platform-link-add" onClick={() => setLinks((current) => [...current, ''])}>
+                  <Plus size={18} /> Add another link
+                </button>
+              </section>
             </div>
           )}
           <UploadProgress progress={uploadProgress} />
-          {submitting && uploadControl && uploadProgress && !['processing', 'cancelled', 'failed'].includes(uploadProgress.status) && (
+          {submitting && uploadControl && uploadProgress && !['processing', 'cancelled', 'failed', 'saved'].includes(uploadProgress.status) && (
             <div className="upload-control-row" aria-label="Upload controls">
               {['paused', 'pausing'].includes(uploadProgress.status) ? (
                 <button type="button" className="secondary-button" onClick={() => uploadControl.resume()} disabled={uploadProgress.status === 'pausing'}><Play size={16} /> {uploadProgress.status === 'pausing' ? 'Pausing…' : 'Resume upload'}</button>
               ) : (
-                <button type="button" className="secondary-button" onClick={() => uploadControl.pause()}><Pause size={16} /> Pause upload</button>
+                <button type="button" className="secondary-button" onClick={() => uploadControl.pause()} disabled={uploadProgress.status === 'cancelling'}><Pause size={16} /> Pause upload</button>
               )}
-              <button type="button" className="cancel-upload-button" onClick={() => uploadControl.cancel()}><Ban size={16} /> Cancel upload</button>
+              <button type="button" className="cancel-upload-button" onClick={() => uploadControl.cancel()} disabled={uploadProgress.status === 'cancelling'}>{uploadProgress.status === 'cancelling' ? 'Cancelling…' : 'Cancel upload'}</button>
             </div>
           )}
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="form-actions">
             <button type="button" className="secondary-button" onClick={close} disabled={submitting}>Cancel</button>
-            <button type="button" className="draft-save-button" onClick={saveDraft} disabled={submitting || draftSaving}><Save size={16} /> {draftSaving ? 'Saving…' : 'Save till and complete later'}</button>
+            <button type="button" className="draft-save-button" onClick={saveDraft} disabled={draftSaving || (submitting && (!uploadControl?.saveForLater || ['processing', 'cancelling'].includes(uploadProgress?.status)))}><Save size={16} /> {draftSaving ? submitting ? 'Saving upload safely…' : 'Saving…' : 'Save till and complete later'}</button>
             <button type="submit" className="primary-button" disabled={submitting}>
-              {submitting ? <><LoaderCircle className="spin" size={17} /> {uploadProgress ? uploadProgress.status === 'processing' ? 'Finishing…' : uploadProgress.status === 'paused' ? `Paused ${uploadProgress.percent}%` : `Uploading ${uploadProgress.percent}%` : 'Posting…'}</> : <><Film size={17} /> {uploadProgress?.status === 'cancelled' ? 'Start upload again' : 'Post it'}</>}
+              {submitting ? <><LoaderCircle className="spin" size={17} /> {uploadProgress ? uploadProgress.status === 'processing' ? 'Finishing…' : uploadProgress.status === 'paused' ? `Paused ${uploadProgress.percent}%` : uploadProgress.status === 'cancelling' ? 'Cancelling…' : `Uploading ${uploadProgress.percent}%` : 'Posting…'}</> : <><Film size={17} /> {uploadCheckpoint ? `Resume from ${uploadProgress?.percent || uploadCheckpoint.percent || 0}%` : uploadProgress?.status === 'cancelled' ? 'Start upload again' : 'Post it'}</>}
             </button>
           </div>
         </form>

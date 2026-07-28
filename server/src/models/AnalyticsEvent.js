@@ -14,7 +14,6 @@ const analyticsEventSchema = new mongoose.Schema({
   occurredAt: { type: Date, required: true, index: true },
 }, { timestamps: true, versionKey: false });
 
-analyticsEventSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 180 });
 analyticsEventSchema.index({ postAuthorId: 1, occurredAt: -1 });
 analyticsEventSchema.index({ sessionId: 1, occurredAt: 1 });
 

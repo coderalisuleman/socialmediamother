@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AtSign, Check, Globe2, LoaderCircle, LockKeyhole, Mail, Phone, Send, UserRound } from 'lucide-react';
-import { getCountries, getCountryCallingCode, getExampleNumber, parsePhoneNumberFromString } from 'libphonenumber-js';
-import mobileExamples from 'libphonenumber-js/mobile/examples';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { LoaderCircle, Mail, Phone, UserRound } from 'lucide-react';
+import { getCountries, getCountryCallingCode, parsePhoneNumberFromString } from 'libphonenumber-js';
 import { api } from '../lib/api';
+import { hasProtectedAuthDraft } from '../lib/authDrafts';
 import Modal from './Modal';
 
 function countryFlag(code) {
@@ -11,31 +11,20 @@ function countryFlag(code) {
 
 function countryOptions() {
   const names = new Intl.DisplayNames(['en'], { type: 'region' });
-  return getCountries().map((code) => {
-    let example = '';
-    try {
-      example = getExampleNumber(code, mobileExamples)?.nationalNumber || '';
-    } catch {
-      example = '';
-    }
-    return {
-      code,
-      name: names.of(code) || code,
-      flag: countryFlag(code),
-      flagUrl: `https://flagcdn.com/40x30/${code.toLowerCase()}.png`,
-      callingCode: getCountryCallingCode(code),
-      example,
-    };
-  }).sort((a, b) => a.name.localeCompare(b.name));
+  return getCountries().map((code) => ({
+    code,
+    name: names.of(code) || code,
+    flag: countryFlag(code),
+    callingCode: getCountryCallingCode(code),
+  })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function PasswordField({ label, value, onChange, autoComplete = 'new-password', required = true, showLock = true, className = '' }) {
+export function PasswordField({ label, value, onChange, autoComplete = 'new-password', required = true, className = '' }) {
   const [shown, setShown] = useState(false);
   return (
-    <label className={`password-field ${showLock ? '' : 'password-field-without-lock'} ${className}`.trim()}>
+    <label className={`password-field password-field-without-lock ${className}`.trim()}>
       <span>{label}</span>
       <div className="input-with-button">
-        {showLock && <LockKeyhole size={17} />}
         <input
           type={shown ? 'text' : 'password'}
           value={value}
@@ -70,7 +59,6 @@ export function PasswordField({ label, value, onChange, autoComplete = 'new-pass
 
 function ChannelTabs({ value, onChange, context = 'create' }) {
   const tabs = [
-    { id: 'username', label: 'Username', icon: AtSign },
     { id: 'phone', label: 'Phone number', icon: Phone },
     { id: 'email', label: 'Email', icon: Mail },
   ];
@@ -89,8 +77,8 @@ export function CreateAccountModal({ open, onClose, onRegister, onSwitchLogin, o
   const countries = useMemo(countryOptions, []);
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
-  const [gender, setGender] = useState('neutral');
-  const [channel, setChannel] = useState('username');
+  const [gender, setGender] = useState('');
+  const [channel, setChannel] = useState('phone');
   const [country, setCountry] = useState('PK');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -107,7 +95,7 @@ export function CreateAccountModal({ open, onClose, onRegister, onSwitchLogin, o
   const phoneStartsWithZero = channel === 'phone' && phoneDigits.startsWith('0');
 
   useEffect(() => {
-    onDirtyChange?.(Boolean(open && (fullName || username || phone || email || otp || password || confirm)));
+    onDirtyChange?.(Boolean(open && hasProtectedAuthDraft('create-account', [fullName, username, phone, email, otp, password, confirm])));
   }, [confirm, email, fullName, onDirtyChange, open, otp, password, phone, username]);
 
   useEffect(() => {
@@ -145,17 +133,14 @@ export function CreateAccountModal({ open, onClose, onRegister, onSwitchLogin, o
     setError('');
     if (!username) return setError('Your username can be short—even one character—but it cannot be empty.');
     if (password !== confirm) return setError('The two passwords do not match yet.');
-    if (phoneStartsWithZero) return setError(`Do not write 0 after +${selectedCountry.callingCode}. Start with ${selectedCountry.example || 'your national number'}.`);
-    if (channel !== 'username' && !otp.trim()) return setError('Enter the verification code sent to you.');
-    if (channel !== 'username' && !challengeId) return setError('Send a verification code first.');
+    if (phoneStartsWithZero) return setError(`Do not write 0 after +${selectedCountry.callingCode}. Start with your national number.`);
+    if (!otp.trim()) return setError('Enter the verification code sent to you.');
+    if (!challengeId) return setError('Send a verification code first.');
     setLoading(true);
     try {
-      let otpVerificationToken;
-      if (channel !== 'username') {
-        const verified = await api.verifyOtp(challengeId, otp.trim());
-        otpVerificationToken = verified?.verificationToken || verified?.data?.verificationToken;
-        if (!otpVerificationToken) throw new Error('The verification response was incomplete.');
-      }
+      const verified = await api.verifyOtp(challengeId, otp.trim());
+      const otpVerificationToken = verified?.verificationToken || verified?.data?.verificationToken;
+      if (!otpVerificationToken) throw new Error('The verification response was incomplete.');
       await onRegister({
         fullName: fullName.trim(),
         username,
@@ -179,7 +164,7 @@ export function CreateAccountModal({ open, onClose, onRegister, onSwitchLogin, o
   return (
     <Modal open={open} onClose={onClose} title="Make your account" eyebrow="Creating your account" wide className="auth-modal">
       <form className="auth-form" onSubmit={submit}>
-        <div className="field-grid two">
+        <div className="field-grid">
           <label>
             <span>Full name</span>
             <div className="input-with-icon"><UserRound size={17} /><input value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" required placeholder="Your full name" /></div>
@@ -195,10 +180,11 @@ export function CreateAccountModal({ open, onClose, onRegister, onSwitchLogin, o
           {[
             ['female', 'Female'],
             ['male', 'Male'],
-            ['neutral', 'Just a person'],
+            ['transgender', 'Transgender'],
+            ['other', 'Other type person'],
           ].map(([id, label]) => (
             <label key={id} className={gender === id ? 'selected' : ''}>
-              <input type="radio" name="gender" value={id} checked={gender === id} onChange={() => setGender(id)} />
+              <input type="radio" name="gender" value={id} checked={gender === id} onChange={() => setGender(id)} required />
               <span className={`mini-person ${id}`}><i /><b /></span>{label}
             </label>
           ))}
@@ -208,28 +194,22 @@ export function CreateAccountModal({ open, onClose, onRegister, onSwitchLogin, o
           <p className="section-label">Create account by</p>
           <ChannelTabs value={channel} onChange={setChannel} />
 
-          {channel === 'username' && (
-            <div className="method-note"><Check size={18} /><span><strong>No OTP, no waiting.</strong> Your unique @username and password are enough.</span></div>
-          )}
-
           {channel === 'phone' && (
             <div className="phone-fields">
               <label>
-                <span>Country or territory</span>
+                <span>Country code</span>
                 <div className="country-select-wrap">
-                  <Globe2 size={17} />
-                  <img className="country-flag-image" src={selectedCountry.flagUrl} alt={`${selectedCountry.name} flag`} />
-                  <select value={country} onChange={(event) => setCountry(event.target.value)}>
+                  <select value={country} onChange={(event) => setCountry(event.target.value)} aria-label="Country calling code">
                     {countries.map((item) => (
-                      <option value={item.code} key={item.code}>{item.flag} {item.name} (+{item.callingCode}){item.example ? ` · ${item.example}` : ''}</option>
+                      <option value={item.code} key={item.code} aria-label={`${item.name} +${item.callingCode}`}>{item.flag} +{item.callingCode}</option>
                     ))}
                   </select>
                 </div>
               </label>
               <label>
                 <span>Your phone number</span>
-                <div className="phone-input"><b><img className="country-flag-image" src={selectedCountry.flagUrl} alt="" /> +{selectedCountry.callingCode}</b><input type="tel" value={phone} onChange={(event) => setPhone(event.target.value.replace(/\D/g, ''))} placeholder={selectedCountry.example || 'Phone number without the first 0'} autoComplete="tel-national" required /></div>
-                {phoneStartsWithZero && <small className="field-error">Do not write the first 0 after +{selectedCountry.callingCode}. Write {selectedCountry.example || 'the national number'}.</small>}
+                <div className="phone-input"><input type="tel" value={phone} onChange={(event) => setPhone(event.target.value.replace(/\D/g, ''))} placeholder="Phone number" autoComplete="tel-national" required /></div>
+                {phoneStartsWithZero && <small className="field-error">Do not write the first 0 after +{selectedCountry.callingCode}.</small>}
               </label>
             </div>
           )}
@@ -241,15 +221,13 @@ export function CreateAccountModal({ open, onClose, onRegister, onSwitchLogin, o
             </label>
           )}
 
-          {channel !== 'username' && (
-            <div className="otp-row">
-              <label><span>One-time code</span><input value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 8))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" required /></label>
-              <button type="button" className="secondary-button" onClick={sendOtp} disabled={otpStatus === 'sending'}>
-                {otpStatus === 'sending' ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />} {otpStatus === 'sent' ? 'Code sent' : 'Send code'}
-              </button>
-              {devOtp && <small className="demo-hint">Local development code: <strong>{devOtp}</strong></small>}
-            </div>
-          )}
+          <div className="otp-row">
+            <label><span>One-time code</span><input value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 8))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" required /></label>
+            <button type="button" className="secondary-button" onClick={sendOtp} disabled={otpStatus === 'sending'}>
+              {otpStatus === 'sending' && <LoaderCircle className="spin" size={16} />} {otpStatus === 'sent' ? 'Code sent' : 'Send code'}
+            </button>
+            {devOtp && <small className="demo-hint">Local development code: <strong>{devOtp}</strong></small>}
+          </div>
         </div>
 
         <div className="field-grid two password-grid">
@@ -267,59 +245,86 @@ export function CreateAccountModal({ open, onClose, onRegister, onSwitchLogin, o
   );
 }
 
-export function LoginModal({ open, onClose, onLogin, onSwitchCreate, currentUser, onDirtyChange }) {
-  const [method, setMethod] = useState('username');
+export function LoginModal({ open, onClose, onLogin, onSwitchCreate, onDirtyChange }) {
+  const [method, setMethod] = useState('phone');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const loginAttemptRef = useRef(0);
 
   useEffect(() => {
-    onDirtyChange?.(Boolean(open && (identifier || password)));
+    onDirtyChange?.(Boolean(open && hasProtectedAuthDraft('account-in', [identifier, password])));
   }, [identifier, onDirtyChange, open, password]);
+
+  useEffect(() => {
+    if (open) return;
+    loginAttemptRef.current += 1;
+    setMethod('phone');
+    setIdentifier('');
+    setPassword('');
+    setError('');
+    setLoading(false);
+  }, [open]);
 
   useEffect(() => {
     setIdentifier('');
     setError('');
   }, [method]);
 
+  const cancelPendingLogin = () => {
+    loginAttemptRef.current += 1;
+    setLoading(false);
+  };
+
+  const closeLogin = () => {
+    cancelPendingLogin();
+    onDirtyChange?.(false);
+    onClose();
+  };
+
+  const switchToCreate = () => {
+    cancelPendingLogin();
+    onDirtyChange?.(false);
+    onSwitchCreate();
+  };
+
   const submit = async (event) => {
     event.preventDefault();
+    if (loading) return;
+    const attemptId = loginAttemptRef.current + 1;
+    loginAttemptRef.current = attemptId;
+    const isCurrent = () => loginAttemptRef.current === attemptId;
     setError('');
     setLoading(true);
     try {
-      const loginIdentifier = method === 'username' ? `@${identifier.replace(/^@/, '')}` : identifier.trim();
-      const shouldClose = await onLogin({ identifier: loginIdentifier, password });
+      const shouldClose = await onLogin({ identifier: identifier.trim(), password }, { isCurrent });
+      if (!isCurrent()) return;
+      setIdentifier('');
+      setPassword('');
       onDirtyChange?.(false);
-      if (shouldClose !== false) onClose();
+      if (shouldClose !== false) closeLogin();
     } catch (loginError) {
-      setError(loginError.message || 'Those account details did not work.');
+      if (isCurrent()) setError(loginError.message || 'Those account details did not work.');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Account in" eyebrow="Welcome back to your people" className="auth-modal login-modal">
-      {currentUser && (
-        <div className="signed-in-note"><Check size={18} /> You are currently in as <strong>@{currentUser.username}</strong>.</div>
-      )}
+    <Modal open={open} onClose={closeLogin} title="Account in" eyebrow="Welcome back to your people" className="auth-modal login-modal">
       <form className="auth-form" onSubmit={submit}>
         <div className="account-method login-method"><p className="section-label">Account in by</p><ChannelTabs value={method} onChange={setMethod} context="login" /></div>
         <label>
-          <span>{method === 'username' ? 'Username' : method === 'phone' ? 'Phone number with country code' : 'Email address'}</span>
-          {method === 'username' ? (
-            <div className="username-input"><b>@</b><input value={identifier} onChange={(event) => setIdentifier(event.target.value.toLowerCase().replace(/[^a-z]/g, ''))} autoComplete="username" required placeholder="username" /></div>
-          ) : (
-            <div className="input-with-icon">{method === 'phone' ? <Phone size={17} /> : <Mail size={17} />}<input type={method === 'email' ? 'email' : 'tel'} value={identifier} onChange={(event) => setIdentifier(method === 'phone' ? event.target.value.replace(/[^\d+\s()-]/g, '') : event.target.value)} autoComplete={method === 'email' ? 'email' : 'tel'} required placeholder={method === 'phone' ? '+923254695657' : 'you@example.com'} /></div>
-          )}
+          <span>{method === 'phone' ? 'Phone number with country code' : 'Email address'}</span>
+          <div className="input-with-icon">{method === 'phone' ? <Phone size={17} /> : <Mail size={17} />}<input type={method === 'email' ? 'email' : 'tel'} value={identifier} onChange={(event) => setIdentifier(method === 'phone' ? event.target.value.replace(/[^\d+\s()-]/g, '') : event.target.value)} autoComplete={method === 'email' ? 'email' : 'tel'} required placeholder={method === 'phone' ? '+92' : 'you@example.com'} /></div>
         </label>
         <PasswordField label="Password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" />
         {error && <p className="form-error" role="alert">{error}</p>}
         <button type="submit" className="primary-button full-button" disabled={loading}>
           {loading ? <><LoaderCircle className="spin" size={17} /> Coming in…</> : 'Account in'}
         </button>
-        <button type="button" className="switch-auth" onClick={onSwitchCreate}>New here? <strong>Make your account</strong></button>
+        <button type="button" className="switch-auth" onClick={switchToCreate}>New here? <strong>Make your account</strong></button>
       </form>
     </Modal>
   );

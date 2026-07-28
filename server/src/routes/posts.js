@@ -9,6 +9,7 @@ import { optionalAuth, requireAuth } from '../middleware/auth.js';
 import { upload } from '../middleware/upload.js';
 import { config } from '../config.js';
 import { publishPostFiles } from '../services/postPublisher.js';
+import { removeFiles } from '../services/files.js';
 
 export const postsRouter = express.Router();
 
@@ -29,8 +30,10 @@ postsRouter.get('/:postId', optionalAuth, asyncHandler(async (req, res) => {
 }));
 
 postsRouter.delete('/:postId', requireAuth, asyncHandler(async (req, res) => {
+  const post = await getPostById(req.params.postId);
   const removed = await softDeletePost(req.params.postId, req.user.id);
   if (!removed) throw new AppError(404, 'Post not found or you do not own it', 'POST_NOT_FOUND');
+  await removeFiles((post?.media || []).map((item) => item.fileId));
   res.status(204).end();
 }));
 

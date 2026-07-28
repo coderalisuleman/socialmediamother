@@ -6,9 +6,23 @@ import { GridFSBucket } from 'mongodb';
 import { config } from '../config.js';
 import { mongoConnection } from '../db.js';
 import { AppError } from '../utils/errors.js';
+import { createConfiguredS3MediaStorage, MEDIA_CACHE_CONTROL } from './s3MediaStorage.js';
 
 const memoryFiles = new Map();
 let bucket;
+const s3Storage = config.aws.mediaStorageEnabled
+  ? createConfiguredS3MediaStorage({
+    region: config.aws.s3Region,
+    accessKeyId: config.aws.accessKeyId,
+    secretAccessKey: config.aws.secretAccessKey,
+    bucket: config.aws.s3Bucket,
+    prefix: config.aws.s3Prefix,
+    cdnBaseUrl: config.aws.mediaCdnBaseUrl,
+    cloudFrontDistributionId: config.aws.cloudFrontDistributionId,
+  })
+  : null;
+
+export const mediaStorageMode = s3Storage ? 's3' : config.storageMode;
 
 const getBucket = () => {
   if (!bucket) bucket = new GridFSBucket(mongoConnection().db, { bucketName: 'uploads', chunkSizeBytes: 255 * 1024 });
@@ -21,6 +35,10 @@ export const saveUploadedFile = async (file, { ownerId, purpose = 'post' } = {})
   if (!file?.path) throw new AppError(422, 'No uploaded file was received', 'FILE_REQUIRED');
   const filename = normalizeName(file.originalname);
   try {
+    if (s3Storage) {
+      return await s3Storage.save({ ...file, originalname: filename }, { ownerId, purpose });
+    }
+
     if (config.storageMode === 'mongodb') {
       const upload = getBucket().openUploadStream(filename, {
         contentType: file.mimetype || 'application/octet-stream',
@@ -51,17 +69,24 @@ export const saveUploadedFile = async (file, { ownerId, purpose = 'post' } = {})
 
 export const deleteFile = async (fileId) => {
   if (!fileId) return;
-  if (config.storageMode === 'mongodb') {
+  const legacyInfo = await getLegacyFileInfo(fileId);
+  if (legacyInfo && config.storageMode === 'mongodb') {
     if (!mongoose.isValidObjectId(fileId)) return;
     await getBucket().delete(new mongoose.Types.ObjectId(fileId)).catch((error) => {
       if (error.code !== 'ENOENT') throw error;
     });
     return;
   }
-  memoryFiles.delete(String(fileId));
+  if (legacyInfo) {
+    memoryFiles.delete(String(fileId));
+    return;
+  }
+  if (s3Storage) {
+    await s3Storage.delete(fileId);
+  }
 };
 
-export const getFileInfo = async (fileId) => {
+const getLegacyFileInfo = async (fileId) => {
   if (config.storageMode === 'mongodb') {
     if (!mongoose.isValidObjectId(fileId)) return null;
     const row = await mongoConnection().db.collection('uploads.files').findOne({ _id: new mongoose.Types.ObjectId(fileId) });
@@ -75,6 +100,14 @@ export const getFileInfo = async (fileId) => {
   if (!row) return null;
   const { data: _data, ...info } = row;
   return info;
+};
+
+export const getFileInfo = async (fileId) => {
+  // Existing GridFS media remains readable after S3 is enabled. New S3 IDs do
+  // not have a GridFS row, so they continue to the object HEAD request.
+  const legacyInfo = await getLegacyFileInfo(fileId);
+  if (legacyInfo) return legacyInfo;
+  return s3Storage ? s3Storage.head(fileId) : null;
 };
 
 const parseRange = (header, size) => {
@@ -109,6 +142,14 @@ export const streamFile = async (req, res) => {
     throw error;
   }
 
+  if (info.storage === 's3' && info.url) {
+    res.set({
+      'Cache-Control': MEDIA_CACHE_CONTROL,
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    });
+    return res.redirect(307, info.url);
+  }
+
   const start = range?.start ?? 0;
   const end = range?.end ?? info.size - 1;
   const length = end - start + 1;
@@ -119,13 +160,19 @@ export const streamFile = async (req, res) => {
     'Content-Length': String(length),
     // Avoid invalid response headers for perfectly valid Arabic/CJK/emoji filenames.
     'Content-Disposition': 'inline',
-    'Cache-Control': 'public, max-age=31536000, immutable',
-    ETag: `"${info.id}-${info.size}"`,
+    'Cache-Control': MEDIA_CACHE_CONTROL,
+    'Cross-Origin-Resource-Policy': 'cross-origin',
+    ETag: info.etag || `"${info.id}-${info.size}"`,
+    ...(info.uploadDate ? { 'Last-Modified': new Date(info.uploadDate).toUTCString() } : {}),
     ...(range ? { 'Content-Range': `bytes ${start}-${end}/${info.size}` } : {})
   });
   if (req.method === 'HEAD') return res.end();
 
-  if (config.storageMode === 'mongodb') {
+  if (info.storage === 's3') {
+    const result = await s3Storage.get(info.id, { range: range ? `bytes=${start}-${end}` : null });
+    if (!result?.Body) throw new AppError(404, 'File not found', 'FILE_NOT_FOUND');
+    await pipeline(result.Body, res);
+  } else if (config.storageMode === 'mongodb') {
     const stream = getBucket().openDownloadStream(new mongoose.Types.ObjectId(info.id), { start, end: end + 1 });
     stream.on('error', (error) => res.destroy(error));
     stream.pipe(res);

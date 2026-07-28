@@ -43,6 +43,16 @@ services:
         sync: false
       - key: AWS_SNS_ORIGINATION_NUMBER
         sync: false
+      - key: AWS_S3_REGION
+        sync: false
+      - key: AWS_S3_BUCKET
+        sync: false
+      - key: AWS_S3_PREFIX
+        value: media
+      - key: MEDIA_CDN_BASE_URL
+        sync: false
+      - key: AWS_CLOUDFRONT_DISTRIBUTION_ID
+        sync: false
       - key: MAX_UPLOAD_MB
         value: "250"
       - key: MAX_FILES_PER_POST

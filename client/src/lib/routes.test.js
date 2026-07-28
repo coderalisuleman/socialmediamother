@@ -29,7 +29,7 @@ test('builds every public and private friendly path', () => {
 test('parses direct account, profile, settings, upload, feed, search, and post links', () => {
   assert.deepEqual(parseAppLocation(locationFor('/createaccount')), { kind: 'create-account' });
   assert.deepEqual(parseAppLocation(locationFor('/accountin')), { kind: 'account-in' });
-  assert.deepEqual(parseAppLocation(locationFor('/humanbehaviour')), { kind: 'human-behaviour' });
+  assert.deepEqual(parseAppLocation(locationFor('/analytics')), { kind: 'human-behaviour' });
   assert.deepEqual(parseAppLocation(locationFor('/Jasmine/')), { kind: 'profile', username: 'jasmine' });
   assert.deepEqual(parseAppLocation(locationFor('/jasmine/setting')), { kind: 'setting', username: 'jasmine' });
   assert.deepEqual(parseAppLocation(locationFor('/jasmine/upload')), { kind: 'upload', username: 'jasmine', uploadMode: null });
@@ -44,6 +44,7 @@ test('parses direct account, profile, settings, upload, feed, search, and post l
 });
 
 test('keeps legacy links compatible and platform names out of profile routes', () => {
+  assert.equal(parseAppLocation(locationFor('/humanbehaviour')).kind, 'not-found');
   assert.deepEqual(parseAppLocation(locationFor('/u/jasmine')), {
     kind: 'profile', username: 'jasmine', legacy: true, canonicalPath: '/jasmine'
   });
@@ -52,4 +53,5 @@ test('keeps legacy links compatible and platform names out of profile routes', (
   });
   assert.equal(parseAppLocation(locationFor('/upload')).kind, 'not-found');
   assert.equal(profilePath('createaccount'), '/');
+  assert.equal(profilePath('analytics'), '/');
 });

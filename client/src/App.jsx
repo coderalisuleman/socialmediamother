@@ -12,6 +12,7 @@ import { EmptyFeed, FeedCard, FeedSkeleton, LoadMore } from './components/Feed';
 import { api, normalizePostShape, normalizePostsResponse, normalizeUserShape, setToken } from './lib/api';
 import { startAnalytics, trackAnalytics } from './lib/analytics';
 import { movePostDrafts } from './lib/drafts';
+import { filterFeedPosts } from './lib/feed';
 import {
   currentUrlPath,
   fallbackPathForRoute,
@@ -54,7 +55,6 @@ export default function App() {
   const [pageError, setPageError] = useState(null);
   const [cursor, setCursor] = useState(null);
   const [done, setDone] = useState(false);
-  const [followingFallback, setFollowingFallback] = useState(false);
   const [notice, setNotice] = useState('');
   const [modal, setModal] = useState(null);
   const [profileEditing, setProfileEditing] = useState(false);
@@ -69,6 +69,7 @@ export default function App() {
   const dirtySourcesRef = useRef(new Map());
   const restoringHistoryRef = useRef(false);
   const analyticsRef = useRef(null);
+  const feedRequestRef = useRef(0);
 
   const markUnsavedChanges = useCallback((source, value) => {
     dirtySourcesRef.current.set(source, Boolean(value));
@@ -169,32 +170,29 @@ export default function App() {
   }, [clearUnsavedChanges, leavePrompt, navigate, performCloseModal]);
 
   const loadFeed = useCallback(async () => {
+    const requestId = ++feedRequestRef.current;
     setLoading(true);
+    setLoadingMore(false);
     setNotice('');
     setPageError(null);
-    setFollowingFallback(false);
     try {
-      let payload = normalizePostsResponse(await api.listPosts({ feed: feedMode, limit: 5 }));
-      if (feedMode === 'following' && payload.fallbackReason) setFollowingFallback(true);
-      if (feedMode === 'following' && payload.items.length === 0 && !payload.fallbackReason) {
-        payload = normalizePostsResponse(await api.listPosts({ feed: 'everyone', limit: 5 }));
-        setFollowingFallback(true);
-      }
+      const payload = normalizePostsResponse(await api.listPosts({ feed: feedMode, limit: 5 }));
+      if (requestId !== feedRequestRef.current) return;
       setPosts(payload.items);
       setCursor(payload.nextCursor);
       setDone(!payload.nextCursor);
     } catch (error) {
+      if (requestId !== feedRequestRef.current) return;
       setPosts([]);
       setCursor(null);
       setDone(true);
-      setFollowingFallback(feedMode === 'following' && !user);
       setNotice(error.message || 'The feed could not be loaded. Please refresh and try again.');
       setPageError({
         title: navigator.onLine ? 'The posts could not be loaded.' : 'Your internet connection is offline.',
         message: navigator.onLine ? (error.message || 'The server did not answer this request.') : 'Reconnect to the internet, then choose Retry.',
       });
     } finally {
-      setLoading(false);
+      if (requestId === feedRequestRef.current) setLoading(false);
     }
   }, [feedMode, user]);
 
@@ -259,21 +257,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    let interacted = false;
-    const markInteraction = () => { interacted = true; };
     const warnBeforeLeaving = (event) => {
-      if (!interacted && !unsavedRef.current) return;
+      if (!unsavedRef.current) return;
       event.preventDefault();
       event.returnValue = '';
     };
-    window.addEventListener('pointerdown', markInteraction, { once: true });
-    window.addEventListener('keydown', markInteraction, { once: true });
     window.addEventListener('beforeunload', warnBeforeLeaving);
-    return () => {
-      window.removeEventListener('pointerdown', markInteraction);
-      window.removeEventListener('keydown', markInteraction);
-      window.removeEventListener('beforeunload', warnBeforeLeaving);
-    };
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
   }, []);
 
   useEffect(() => {
@@ -306,7 +296,6 @@ export default function App() {
     } else if (route.kind === 'account-in') {
       if (user) {
         setModal(null);
-        setNotice('You are already account-in.');
         navigate('/', { replace: true });
         return () => { active = false; };
       }
@@ -365,7 +354,7 @@ export default function App() {
     } else if (route.kind === 'search') {
       document.title = `${route.query || 'Search'} | Mother`;
     } else if (route.kind === 'human-behaviour') {
-      document.title = 'Human-behaviour team | Mother';
+      document.title = 'Analytics team | Mother';
     } else if (route.kind === 'feed') {
       document.title = `${route.feedMode === 'following' ? 'My people' : "Everyone's posts"} | Mother`;
     } else {
@@ -389,16 +378,19 @@ export default function App() {
 
   const loadMore = async () => {
     if (loadingMore || done) return;
+    const requestId = feedRequestRef.current;
     setLoadingMore(true);
     try {
       const payload = normalizePostsResponse(await api.listPosts({ feed: feedMode, cursor, limit: 5 }));
+      if (requestId !== feedRequestRef.current) return;
       setPosts((current) => [...current, ...payload.items.filter((item) => !current.some((post) => post.id === item.id))]);
       setCursor(payload.nextCursor);
       setDone(!payload.nextCursor);
     } catch {
+      if (requestId !== feedRequestRef.current) return;
       setNotice('That next wave did not arrive. Check your connection and try once more.');
     } finally {
-      setLoadingMore(false);
+      if (requestId === feedRequestRef.current) setLoadingMore(false);
     }
   };
 
@@ -412,7 +404,12 @@ export default function App() {
     values.files.forEach((file) => form.append('files', file));
 
     try {
-      const payload = await api.createPost(form, { onUploadProgress, onUploadControl, onUploadState });
+      const payload = await api.createPost(form, {
+        onUploadProgress,
+        onUploadControl,
+        onUploadState,
+        resumeSession: values.uploadCheckpoint || null,
+      });
       const post = normalizePostShape(payload?.post || payload?.data?.post || payload?.data || payload);
       setPosts((current) => [post, ...current]);
       setDraftToEdit(null);
@@ -444,13 +441,15 @@ export default function App() {
     navigate('/');
   };
 
-  const login = async (values) => {
+  const login = async (values, { isCurrent = () => true } = {}) => {
     const payload = await api.login(values);
+    if (!isCurrent()) return false;
     if (payload?.token) setToken(payload.token);
     const nextUser = normalizeUser(payload, null);
     if (!nextUser) throw new Error('The account response was incomplete.');
     setUser(nextUser);
     saveLocalUser(nextUser);
+    return true;
   };
 
   const logout = async () => {
@@ -601,6 +600,10 @@ export default function App() {
   };
 
   const changeFeedMode = (mode) => {
+    if (mode !== feedMode) {
+      feedRequestRef.current += 1;
+      setLoadingMore(false);
+    }
     setFeedMode(mode);
     navigate(feedPath(mode, user?.username));
   };
@@ -637,7 +640,7 @@ export default function App() {
   };
 
   const searchActive = query.trim().length > 0;
-  const visiblePosts = focusedPost ? [focusedPost] : posts;
+  const visiblePosts = focusedPost ? [focusedPost] : filterFeedPosts(posts, feedMode);
   const profileActive = ['profile', 'setting'].includes(route.kind);
   const humanBehaviourActive = route.kind === 'human-behaviour';
   const frontPageActive = ['home', 'feed'].includes(route.kind) && !searchActive && !focusedPost;
@@ -715,7 +718,7 @@ export default function App() {
                 <h1 id="feed-title">{focusedPost.name || `A ${focusedPost.type} post`}</h1>
                 <p>Shared by @{focusedPost.author?.username}.</p>
               </div>
-            </header> : <h1 id="feed-title" className="sr-only">{feedMode === 'everyone' ? 'Everyones Every Post' : 'The People To with I want To be There Posts'}</h1>}
+            </header> : <h1 id="feed-title" className="sr-only">{feedMode === 'everyone' ? 'Everyones Every Post' : 'The People I Want To See There Posts'}</h1>}
 
             {loading && !focusedPost ? <FeedSkeleton /> : pageError && !focusedPost ? (
               <section className="page-load-error" role="alert"><strong>{pageError.title}</strong><p>{pageError.message}</p><small>If your internet is slow, wait a moment. If it is disconnected, reconnect first.</small><button type="button" className="primary-button" onClick={loadFeed}>Retry</button></section>
@@ -766,12 +769,12 @@ export default function App() {
       <LoginModal
         open={modal === 'login'}
         onClose={closeModal}
-        onLogin={async (values) => {
-          await login(values);
+        onLogin={async (values, options) => {
+          const applied = await login(values, options);
+          if (!applied) return false;
           return !['setting', 'upload'].includes(route.kind);
         }}
         onSwitchCreate={() => openOverlay('/createaccount', { replace: true })}
-        currentUser={user}
         onDirtyChange={(value) => markUnsavedChanges('account-in', value)}
       />
     </div>

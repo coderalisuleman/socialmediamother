@@ -17,22 +17,10 @@ feedRouter.get('/', optionalAuth, asyncHandler(async (req, res) => {
   const offset = Number.isInteger(cursorState?.offset) && cursorState.offset >= 0 ? cursorState.offset : 0;
   let authorIds;
   let viewerFollowingIds = [];
-  let scope = requestedScope;
-  let fallbackReason = null;
 
   if (requestedScope === 'following') {
-    if (!req.user) {
-      scope = 'everyone';
-      fallbackReason = 'sign-in-required';
-    } else {
-      authorIds = await getFollowingIds(req.user.id);
-      viewerFollowingIds = authorIds;
-      if (!authorIds.length) {
-        authorIds = undefined;
-        scope = 'everyone';
-        fallbackReason = 'not-following-anyone-yet';
-      }
-    }
+    authorIds = req.user ? await getFollowingIds(req.user.id) : [];
+    viewerFollowingIds = authorIds;
   }
 
   if (req.user && requestedScope !== 'following') {
@@ -60,9 +48,9 @@ feedRouter.get('/', optionalAuth, asyncHandler(async (req, res) => {
     nextCursor = encodeCursor({ before: { createdAt: anchor.createdAt, id: anchor.id }, offset: 0 });
   }
   res.json({
-    scope,
+    scope: requestedScope,
     requestedScope,
-    fallbackReason,
+    fallbackReason: null,
     posts: rankedPage.map(({ post, score }) => publicPost(post, {
       viewerReaction: reactions[post.id] || null,
       viewerFollowsAuthor: followingSet.has(String(post.author?.id || post.author?._id)),

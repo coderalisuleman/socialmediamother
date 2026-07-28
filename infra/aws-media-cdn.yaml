@@ -1,0 +1,280 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Private SocialMediaMother media storage with CloudFront delivery and deletion invalidation support.
+
+Parameters:
+  ResourceNamePrefix:
+    Type: String
+    Default: socialmediamother
+    AllowedPattern: '^[A-Za-z0-9-]{3,40}$'
+    Description: Short unique prefix for globally managed CloudFront policies.
+  AllowedWebOrigin:
+    Type: String
+    Default: https://socialmediamother.onrender.com
+    Description: Exact web origin allowed to read media through CORS.
+  MediaPrefix:
+    Type: String
+    Default: media
+    AllowedPattern: '^[A-Za-z0-9][A-Za-z0-9/_-]*$'
+    Description: S3 object-key prefix used by the application.
+  NoncurrentVersionExpirationDays:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    Description: Days to retain superseded or deleted object versions.
+  AbortMultipartUploadDays:
+    Type: Number
+    Default: 7
+    MinValue: 1
+    Description: Days before abandoned multipart uploads are removed.
+
+Resources:
+  MediaBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - '*'
+            AllowedMethods:
+              - GET
+              - HEAD
+            AllowedOrigins:
+              - !Ref AllowedWebOrigin
+            ExposedHeaders:
+              - Accept-Ranges
+              - Cache-Control
+              - Content-Length
+              - Content-Range
+              - Content-Type
+              - ETag
+              - Last-Modified
+            MaxAge: 86400
+      LifecycleConfiguration:
+        Rules:
+          - Id: ManageMediaVersionsAndMultipartUploads
+            Status: Enabled
+            Prefix: !Sub '${MediaPrefix}/'
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: !Ref AbortMultipartUploadDays
+            ExpiredObjectDeleteMarker: true
+            NoncurrentVersionExpiration:
+              NoncurrentDays: !Ref NoncurrentVersionExpirationDays
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+
+  MediaOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Description: Signed access from CloudFront to the private media bucket.
+        Name: !Sub '${ResourceNamePrefix}-media-oac'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  MediaCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Comment: Cache versioned media at the edge while respecting browser Cache-Control.
+        DefaultTTL: 86400
+        MaxTTL: 31536000
+        MinTTL: 0
+        Name: !Sub '${ResourceNamePrefix}-media-cache'
+        ParametersInCacheKeyAndForwardedToOrigin:
+          CookiesConfig:
+            CookieBehavior: none
+          EnableAcceptEncodingBrotli: false
+          EnableAcceptEncodingGzip: false
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+
+  MediaCorsOriginRequestPolicy:
+    Type: AWS::CloudFront::OriginRequestPolicy
+    Properties:
+      OriginRequestPolicyConfig:
+        Comment: Forward only the headers required for S3 CORS preflight.
+        CookiesConfig:
+          CookieBehavior: none
+        HeadersConfig:
+          HeaderBehavior: whitelist
+          Headers:
+            - Access-Control-Request-Headers
+            - Access-Control-Request-Method
+            - Origin
+        Name: !Sub '${ResourceNamePrefix}-media-cors-origin'
+        QueryStringsConfig:
+          QueryStringBehavior: none
+
+  MediaResponseHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Comment: Cross-origin media and Range response headers for browser playback and Cache API.
+        CorsConfig:
+          AccessControlAllowCredentials: false
+          AccessControlAllowHeaders:
+            Items:
+              - '*'
+          AccessControlAllowMethods:
+            Items:
+              - GET
+              - HEAD
+              - OPTIONS
+          AccessControlAllowOrigins:
+            Items:
+              - !Ref AllowedWebOrigin
+          AccessControlExposeHeaders:
+            Items:
+              - Accept-Ranges
+              - Cache-Control
+              - Content-Length
+              - Content-Range
+              - Content-Type
+              - ETag
+              - Last-Modified
+          AccessControlMaxAgeSec: 86400
+          OriginOverride: true
+        CustomHeadersConfig:
+          Items:
+            - Header: Cross-Origin-Resource-Policy
+              Override: true
+              Value: cross-origin
+        Name: !Sub '${ResourceNamePrefix}-media-response'
+        SecurityHeadersConfig:
+          ContentTypeOptions:
+            Override: true
+
+  MediaDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Sub '${ResourceNamePrefix} private media CDN'
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachePolicyId: !Ref MediaCachePolicy
+          CachedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          Compress: false
+          OriginRequestPolicyId: !Ref MediaCorsOriginRequestPolicy
+          ResponseHeadersPolicyId: !Ref MediaResponseHeadersPolicy
+          TargetOriginId: PrivateMediaBucket
+          ViewerProtocolPolicy: redirect-to-https
+        Enabled: true
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        Origins:
+          - DomainName: !GetAtt MediaBucket.RegionalDomainName
+            Id: PrivateMediaBucket
+            OriginAccessControlId: !GetAtt MediaOriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+  MediaBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref MediaBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action:
+              - s3:*
+            Resource:
+              - !GetAtt MediaBucket.Arn
+              - !Sub '${MediaBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: AllowCloudFrontReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action:
+              - s3:GetObject
+            Resource: !Sub '${MediaBucket.Arn}/${MediaPrefix}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${MediaDistribution}'
+
+  MediaApplicationManagedPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Attach to the IAM user whose access keys are configured on Render.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ListMediaObjects
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource: !GetAtt MediaBucket.Arn
+            Condition:
+              StringLike:
+                's3:prefix':
+                  - !Sub '${MediaPrefix}/*'
+          - Sid: ManageMultipartUploads
+            Effect: Allow
+            Action:
+              - s3:ListBucketMultipartUploads
+            Resource: !GetAtt MediaBucket.Arn
+          - Sid: ManageMediaObjects
+            Effect: Allow
+            Action:
+              - s3:AbortMultipartUpload
+              - s3:DeleteObject
+              - s3:GetObject
+              - s3:ListMultipartUploadParts
+              - s3:PutObject
+            Resource: !Sub '${MediaBucket.Arn}/${MediaPrefix}/*'
+          - Sid: InvalidateDeletedMedia
+            Effect: Allow
+            Action:
+              - cloudfront:CreateInvalidation
+            Resource: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${MediaDistribution}'
+
+Outputs:
+  MediaBucketName:
+    Description: Set this as AWS_S3_BUCKET.
+    Value: !Ref MediaBucket
+  MediaBucketRegion:
+    Description: Set this as AWS_S3_REGION.
+    Value: !Ref AWS::Region
+  MediaCdnBaseUrl:
+    Description: Set this as MEDIA_CDN_BASE_URL.
+    Value: !Sub 'https://${MediaDistribution.DomainName}'
+  CloudFrontDistributionId:
+    Description: Set this as AWS_CLOUDFRONT_DISTRIBUTION_ID.
+    Value: !Ref MediaDistribution
+  MediaObjectPrefix:
+    Description: Set this as AWS_S3_PREFIX.
+    Value: !Ref MediaPrefix
+  MediaApplicationManagedPolicyArn:
+    Description: Attach this policy to the IAM user used by Render for media storage.
+    Value: !Ref MediaApplicationManagedPolicy

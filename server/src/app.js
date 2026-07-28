@@ -20,6 +20,7 @@ import { uploadsRouter } from './routes/uploads.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { AppError, errorHandler, notFound } from './utils/errors.js';
 import { findUserByIdentifier, getPostById, listSitemapEntities } from './services/store.js';
+import { mediaStorageMode } from './services/files.js';
 import { classifyPagePath, postPath, profilePath } from './utils/publicRoutes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -27,6 +28,8 @@ const clientDist = path.resolve(__dirname, '../../client/dist');
 const indexPath = path.join(clientDist, 'index.html');
 const canonicalOrigin = config.publicUrl;
 const allowedOrigins = new Set([...config.clientOrigins, canonicalOrigin]);
+const defaultShareImage = '/brand/me-click-og.png';
+const defaultShareImageAlt = 'The word me as a button, with a human finger pressing it';
 
 const escapeHtml = (value) => String(value || '')
   .replaceAll('&', '&amp;')
@@ -44,7 +47,7 @@ const escapeXml = (value) => String(value || '')
 
 const absoluteUrl = (value) => value
   ? new URL(value, canonicalOrigin).toString()
-  : `${canonicalOrigin}/brand/mother-og.jpg`;
+  : `${canonicalOrigin}${defaultShareImage}`;
 
 export const injectMetadata = (html, metadata) => {
   const safe = {
@@ -78,7 +81,8 @@ export const injectMetadata = (html, metadata) => {
     '<meta name="twitter:card" content="summary_large_image">',
     `<meta name="twitter:title" content="${safe.title}">`,
     `<meta name="twitter:description" content="${safe.description}">`,
-    `<meta name="twitter:image" content="${safe.image}">`
+    `<meta name="twitter:image" content="${safe.image}">`,
+    `<meta name="twitter:image:alt" content="${safe.imageAlt}">`
   ].join('\n');
 
   const withoutExisting = html
@@ -91,7 +95,7 @@ export const injectMetadata = (html, metadata) => {
 const baseMetadata = {
   title: 'SocialMediaMother',
   description: 'A free place where anyone from anywhere can share text, photos, videos, and short videos.',
-  url: `${canonicalOrigin}/`, image: '/brand/mother-og.jpg', imageAlt: 'SocialMediaMother creators hugging', type: 'website',
+  url: `${canonicalOrigin}/`, image: defaultShareImage, imageAlt: defaultShareImageAlt, type: 'website',
   robots: 'index, follow, max-image-preview:large'
 };
 
@@ -105,8 +109,8 @@ export const metadataForRoute = async (route) => {
       title: `${user.fullName} (@${user.username}) | SocialMediaMother`,
       description: (user.bio || `See ${user.fullName}'s posts on Social Media Mother.`).slice(0, 240),
       url: `${canonicalOrigin}${profilePath(user.username)}`,
-      image: user.profileImageFileId ? `/api/files/${user.profileImageFileId}` : '/brand/mother-og.jpg',
-      imageAlt: `${user.fullName}'s profile photo`,
+      image: user.profileImageFileId ? `/api/files/${user.profileImageFileId}` : defaultShareImage,
+      imageAlt: user.profileImageFileId ? `${user.fullName}'s profile photo` : defaultShareImageAlt,
       type: 'profile',
       robots: 'index, follow, max-image-preview:large'
     };
@@ -117,13 +121,15 @@ export const metadataForRoute = async (route) => {
       const leadingText = post.nameIt || post.text || `${post.type} post`;
       const previewImage = post.media?.find((item) => item.contentType?.startsWith('image/'));
       const previewVideo = post.media?.find((item) => item.contentType?.startsWith('video/'));
+      const previewImageUrl = previewImage?.url || (previewImage?.fileId ? `/api/files/${previewImage.fileId}` : null);
+      const previewVideoUrl = previewVideo?.url || (previewVideo?.fileId ? `/api/files/${previewVideo.fileId}` : null);
       return {
         title: `${leadingText.slice(0, 90)} — @${post.author.username} | SocialMediaMother`,
         description: (post.detail || post.text || `See this ${post.type} post on Social Media Mother.`).slice(0, 240),
         url: `${canonicalOrigin}${postPath(post.id)}`,
-        image: previewImage?.fileId ? `/api/files/${previewImage.fileId}` : post.author.profileImageFileId ? `/api/files/${post.author.profileImageFileId}` : '/brand/mother-og.jpg',
-        imageAlt: post.nameIt || `Post by ${post.author.fullName}`,
-        video: previewVideo?.fileId ? `/api/files/${previewVideo.fileId}` : null,
+        image: previewImageUrl || (post.author.profileImageFileId ? `/api/files/${post.author.profileImageFileId}` : defaultShareImage),
+        imageAlt: previewImageUrl || post.author.profileImageFileId ? post.nameIt || `Post by ${post.author.fullName}` : defaultShareImageAlt,
+        video: previewVideoUrl,
         videoType: previewVideo?.contentType,
         type: 'article',
         robots: 'index, follow, max-image-preview:large'
@@ -135,7 +141,7 @@ export const metadataForRoute = async (route) => {
     const privateTitles = {
       createaccount: 'Create your account',
       accountin: 'Account in',
-      humanbehaviour: 'Human-behaviour team',
+      analytics: 'Analytics team',
       setting: 'Account settings',
       upload: 'Upload a post',
       'upload-format': `Upload ${String(route.format || 'post').replaceAll('-', ' ')}`
@@ -144,8 +150,8 @@ export const metadataForRoute = async (route) => {
       title: `${privateTitles[route.page] || 'Private page'} | SocialMediaMother`,
       description: 'A private account action on Social Media Mother.',
       url: `${canonicalOrigin}${route.path}`,
-      image: '/brand/mother-og.jpg',
-      imageAlt: 'SocialMediaMother creators hugging',
+      image: defaultShareImage,
+      imageAlt: defaultShareImageAlt,
       type: 'website',
       robots: 'noindex, nofollow, noarchive'
     };
@@ -155,8 +161,8 @@ export const metadataForRoute = async (route) => {
     title: 'Page not found | SocialMediaMother',
     description: 'This Social Media Mother page could not be found.',
     url: `${canonicalOrigin}${route.path || '/'}`,
-    image: '/brand/mother-og.jpg',
-    imageAlt: 'SocialMediaMother creators hugging',
+    image: defaultShareImage,
+    imageAlt: defaultShareImageAlt,
     type: 'website',
     robots: 'noindex, nofollow, noarchive'
   };
@@ -223,6 +229,7 @@ export const createApp = () => {
     res.status(database.ready ? 200 : 503).json({
       status: database.ready ? 'ok' : 'degraded',
       storageMode: database.mode,
+      mediaStorageMode,
       databaseReady: database.ready,
       uptimeSeconds: Math.floor(process.uptime()),
       timestamp: new Date().toISOString()
@@ -249,7 +256,7 @@ export const createApp = () => {
         'Disallow: /api/',
         'Disallow: /createaccount',
         'Disallow: /accountin',
-        'Disallow: /humanbehaviour',
+        'Disallow: /analytics',
         'Disallow: /*/setting',
         'Disallow: /*/upload',
         `Sitemap: ${canonicalOrigin}/sitemap.xml`,

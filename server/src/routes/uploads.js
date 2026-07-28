@@ -4,7 +4,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { publicPost } from '../services/serializers.js';
 import { publishPostFiles } from '../services/postPublisher.js';
 import {
-  assembleUploadSession, cancelUploadSession, createUploadSession, storeUploadChunk, UPLOAD_CHUNK_BYTES
+  assembleUploadSession, cancelUploadSession, createUploadSession, getUploadSession, storeUploadChunk, UPLOAD_CHUNK_BYTES
 } from '../services/uploadSessions.js';
 
 export const uploadsRouter = express.Router();
@@ -12,6 +12,10 @@ export const uploadsRouter = express.Router();
 uploadsRouter.post('/sessions', requireAuth, asyncHandler(async (req, res) => {
   const session = await createUploadSession(req.user.id, req.body?.files);
   res.status(201).json({ session });
+}));
+
+uploadsRouter.get('/sessions/:sessionId', requireAuth, asyncHandler(async (req, res) => {
+  res.json({ session: await getUploadSession(req.params.sessionId, req.user.id) });
 }));
 
 uploadsRouter.put(
@@ -33,6 +37,14 @@ uploadsRouter.put(
 uploadsRouter.post('/sessions/:sessionId/complete', requireAuth, asyncHandler(async (req, res) => {
   const files = await assembleUploadSession(req.params.sessionId, req.user.id);
   const post = await publishPostFiles({ files, body: req.body || {}, userId: req.user.id });
+  try {
+    await cancelUploadSession(req.params.sessionId, req.user.id);
+  } catch (error) {
+    console.error('Published post upload-session cleanup failed', {
+      sessionId: req.params.sessionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
   res.status(201).json({ post: publicPost(post) });
 }));
 

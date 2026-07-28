@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronLeft, ChevronRight, Facebook, Github, Globe2, Image as ImageIcon, Info, Instagram, Linkedin, MessageCircle, Pencil, Play, Send, Smartphone, Square, Trash2, Video, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Facebook, Github, Image as ImageIcon, Info, Instagram, Linkedin, MessageCircle, Pencil, Play, Smartphone, Square, Trash2, Video, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { trackAnalytics } from '../lib/analytics';
 import { useInView, useReducedMotion } from '../lib/hooks';
@@ -46,37 +46,6 @@ function PictureScreenIcon({ expanded }) {
   );
 }
 
-function FilesFolderIcon({ open }) {
-  return (
-    <svg className={`files-folder-icon ${open ? 'open' : ''}`} viewBox="0 0 46 38" aria-hidden="true">
-      <path className="folder-paper paper-back" d="M15 4h22v24H15z" />
-      <path className="folder-paper paper-middle" d="M10 7h24v23H10z" />
-      <path className="folder-tab" d="M3 12V8h15l4 4h21v21H3Z" />
-      <path className="folder-front" d="M3 16h40l-4 18H7Z" />
-      <path className="folder-lines" d="M15 11h13m-13 5h17" />
-    </svg>
-  );
-}
-
-function TelescopeZoomIcon() {
-  return (
-    <svg className="telescope-zoom-icon" viewBox="0 0 72 56" aria-hidden="true">
-      <defs><linearGradient id="scopeBody" x1="0" x2="1"><stop stopColor="#eefaff" /><stop offset=".2" stopColor="#79cce8" /><stop offset=".62" stopColor="#315b6b" /><stop offset="1" stopColor="#14252d" /></linearGradient><radialGradient id="scopeLens"><stop stopColor="#fff" /><stop offset=".35" stopColor="#8ce7ff" /><stop offset=".7" stopColor="#247694" /><stop offset="1" stopColor="#10242e" /></radialGradient></defs>
-      <ellipse className="scope-shadow" cx="38" cy="51" rx="27" ry="3" />
-      <g className="scope-body" transform="rotate(-17 35 22)">
-        <path className="scope-main-tube" d="M15 12h42v19H15Z" fill="url(#scopeBody)" />
-        <path className="scope-eyepiece" d="M5 17h12v9H5l-3-2v-5Z" />
-        <ellipse className="scope-lens-rim" cx="58" cy="21.5" rx="7" ry="11.5" />
-        <ellipse className="scope-lens" cx="59" cy="21.5" rx="4.8" ry="8.5" fill="url(#scopeLens)" />
-        <path className="scope-ring" d="M21 12v19m29-19v19" />
-        <path className="scope-focus-knob" d="M28 31v6h9v-6" />
-      </g>
-      <circle className="scope-star star-one" cx="62" cy="6" r="2" /><path className="scope-star star-two" d="m68 14 1 3 3 1-3 1-1 3-1-3-3-1 3-1Z" />
-      <path className="scope-stand" d="M35 34v7m0-2L18 53m17-14 17 14m-17-14v15" />
-    </svg>
-  );
-}
-
 function CameraFilmIcon() {
   return (
     <svg className="film-camera-icon" viewBox="0 0 58 50" aria-hidden="true">
@@ -90,7 +59,8 @@ function CameraFilmIcon() {
 
 function MediaLoading({ kind }) {
   const Icon = kind === 'photo' ? ImageIcon : kind === 'short-video' ? Smartphone : Video;
-  return <div className={`media-format-loading loading-${kind}`} role="status"><Icon size={34} /><strong>Loading<span className="loading-dots" aria-hidden="true">...</span></strong></div>;
+  const label = kind === 'photo' ? 'Loading photo' : kind === 'short-video' ? 'Loading short video' : 'Loading video';
+  return <div className={`media-format-loading loading-${kind}`} role="status" aria-live="polite"><Icon className="media-loading-icon" size={42} /><strong className="media-loading-label">{label}<span className="loading-dots" aria-hidden="true">...</span></strong></div>;
 }
 
 function PlatformIcon({ platform, size = 18 }) {
@@ -101,7 +71,7 @@ function PlatformIcon({ platform, size = 18 }) {
   if (platform === 'github') return <Github size={size} fill="currentColor" />;
   if (platform === 'tiktok') return <svg className="platform-custom-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v11.2a4.3 4.3 0 1 1-3.4-4.2v3a1.5 1.5 0 1 0 .4 1V3h3c.5 2 1.8 3.3 4 3.8v3a8 8 0 0 1-4-1.7V3Z" /></svg>;
   if (platform === 'x') return <svg className="platform-custom-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h4.6l4.2 5.6L17.7 4H20l-6.2 7.2L20 20h-4.6l-4.6-6.1L5.5 20H3.2l6.6-7.7L4 4Zm3.4 2 9 12h1.7l-9-12H7.4Z" /></svg>;
-  return <Globe2 size={size} />;
+  return <img className="platform-earth-icon" src="/brand/earth-realistic.png" width={size} height={size} alt="" aria-hidden="true" />;
 }
 
 function formatMediaTime(value) {
@@ -112,11 +82,11 @@ function formatMediaTime(value) {
   return `${String(hours).padStart(2, '0')} : ${String(minutes).padStart(2, '0')} : ${String(seconds).padStart(2, '0')}`;
 }
 
-function AssetError({ message, onRetry }) {
+function AssetError({ message, helpText = 'Check your internet connection, then try loading this item again.', onRetry }) {
   return (
     <div className="media-error" role="alert">
       <strong>{message}</strong>
-      <small>Check your internet connection, then try loading this item again.</small>
+      <small>{helpText}</small>
       <button type="button" onClick={(event) => { event.stopPropagation(); onRetry(); }}>Retry</button>
     </div>
   );
@@ -149,7 +119,19 @@ function VideoSlide({ item, active, inView, controlsVisible, analyticsContext, m
   const [status, setStatus] = useState('loading');
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [bufferedUntil, setBufferedUntil] = useState(0);
+  const [offline, setOffline] = useState(() => !navigator.onLine);
   const [retryKey, setRetryKey] = useState(0);
+  useEffect(() => {
+    const wentOnline = () => setOffline(false);
+    const wentOffline = () => setOffline(true);
+    window.addEventListener('online', wentOnline);
+    window.addEventListener('offline', wentOffline);
+    return () => {
+      window.removeEventListener('online', wentOnline);
+      window.removeEventListener('offline', wentOffline);
+    };
+  }, []);
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -179,6 +161,17 @@ function VideoSlide({ item, active, inView, controlsVisible, analyticsContext, m
   }, [active, analyticsContext?.format, analyticsContext?.postAuthorId, analyticsContext?.postId, inView, paused, status]);
 
   const watchedPercent = duration ? Math.min(100, Math.max(0, Math.round((currentTime / duration) * 100))) : 0;
+  const bufferedPercent = duration ? Math.min(100, Math.max(0, Math.round((bufferedUntil / duration) * 100))) : 0;
+  const updateBufferedTime = (video) => {
+    const playbackTime = Number(video.currentTime) || 0;
+    let availableUntil = 0;
+    for (let index = 0; index < video.buffered.length; index += 1) {
+      const start = video.buffered.start(index);
+      const end = video.buffered.end(index);
+      if (playbackTime >= start && playbackTime <= end) availableUntil = Math.max(availableUntil, end);
+    }
+    setBufferedUntil(availableUntil);
+  };
 
   return (
     <div className={`video-wrap ${status === 'loading' ? 'media-is-loading' : ''}`}>
@@ -190,27 +183,32 @@ function VideoSlide({ item, active, inView, controlsVisible, analyticsContext, m
         muted={muted}
         loop
         playsInline
-        preload="metadata"
+        crossOrigin="anonymous"
+        preload="auto"
         aria-label={item.alt || 'Post video'}
         onLoadStart={() => setStatus('loading')}
-        onLoadedData={() => setStatus('ready')}
+        onLoadedData={(event) => { setStatus('ready'); updateBufferedTime(event.currentTarget); }}
+        onCanPlay={(event) => updateBufferedTime(event.currentTarget)}
         onLoadedMetadata={(event) => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}
         onDurationChange={(event) => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}
-        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime || 0)}
+        onTimeUpdate={(event) => { setCurrentTime(event.currentTarget.currentTime || 0); updateBufferedTime(event.currentTarget); }}
+        onProgress={(event) => updateBufferedTime(event.currentTarget)}
         onError={() => setStatus('error')}
       />
       {status === 'loading' && <MediaLoading kind={analyticsContext?.format === 'short-video' ? 'short-video' : 'video'} />}
-      {status === 'error' && <AssetError message="This video could not be loaded." onRetry={() => { setStatus('loading'); setRetryKey((value) => value + 1); }} />}
+      {status === 'error' && <AssetError message={offline ? 'This part was not buffered before you went offline.' : 'This video could not be loaded.'} helpText={offline ? 'You can watch the part already buffered. Reconnect to continue beyond it.' : undefined} onRetry={() => { setStatus('loading'); setRetryKey((value) => value + 1); }} />}
+      {controlsVisible && status === 'ready' && duration > 0 && <span className={`media-buffer-status ${offline ? 'is-offline' : ''}`} role="status">{offline ? (bufferedUntil > currentTime ? `Offline · buffered through ${formatMediaTime(bufferedUntil)}` : 'Offline · more video needs internet') : `Buffered ahead ${bufferedPercent}%`}</span>}
       {controlsVisible && status !== 'error' && <button type="button" className="media-play" onClick={(event) => { event.stopPropagation(); setPaused((value) => !value); }} aria-label={paused ? 'Play video' : 'Stop video'}>
         {paused ? <Play size={22} fill="currentColor" /> : <Square size={20} fill="currentColor" />}
       </button>}
       {controlsVisible && status !== 'error' && (
         <div className="video-time-controls" onClick={(event) => event.stopPropagation()}>
           <div className="video-time-readout"><strong>{formatMediaTime(currentTime)}</strong><span>of</span><strong>{formatMediaTime(duration)}</strong></div>
-          <div className="film-progress-explanation" aria-hidden="true"><span className="watched-key"><i />Watched {watchedPercent}%</span><span className="left-key"><i />Left {100 - watchedPercent}%</span></div>
-          <div className={`camera-film-timeline ${paused ? 'is-paused' : ''}`} style={{ '--film-progress': `${watchedPercent}%` }}>
+          <div className="film-progress-explanation"><span className="watched-key"><i />Watched {watchedPercent}%</span><span className="buffered-key"><i />Buffered {bufferedPercent}%</span><span className="left-key"><i />Left {100 - watchedPercent}%</span></div>
+          <div className={`camera-film-timeline ${paused ? 'is-paused' : ''}`} style={{ '--film-progress': `${watchedPercent}%`, '--buffered-progress': `${bufferedPercent}%` }}>
             <span className="film-camera" aria-hidden="true"><CameraFilmIcon /></span>
             <span className="film-strip" aria-hidden="true">
+              <i className="film-buffered" />
               <i className="film-watched" />
               {Array.from({ length: 9 }, (_, frame) => <b key={frame}><em /></b>)}
             </span>
@@ -236,23 +234,17 @@ function VideoSlide({ item, active, inView, controlsVisible, analyticsContext, m
 export function MediaCarousel({ media = [], short = false, preview = false, priority = false, postId = '', postAuthorId = '', postFormat = '' }) {
   const [index, setIndex] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
-  const [postureFallback, setPostureFallback] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(false);
-  const [toolboxOpen, setToolboxOpen] = useState(false);
   const [carouselPaused, setCarouselPaused] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [boundaryNotice, setBoundaryNotice] = useState('');
-  const [orientationMode, setOrientationMode] = useState('auto');
-  const [deviceOrientation, setDeviceOrientation] = useState(() => window.matchMedia?.('(orientation: portrait)').matches ? 'portrait' : 'landscape');
   const [muted, setMuted] = useState(true);
   const [containerRef, inView] = useInView();
   const reducedMotion = useReducedMotion();
   const touchStart = useRef(null);
   const pinchStart = useRef(null);
   const current = media[index];
-  const shownOrientation = orientationMode === 'auto' ? deviceOrientation : orientationMode;
-  const mediaExpanded = fullscreen || postureFallback;
+  const mediaExpanded = fullscreen;
 
   useEffect(() => {
     if (!inView || reducedMotion || media.length < 2 || preview || carouselPaused) return undefined;
@@ -268,7 +260,6 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
     const update = () => {
       const active = document.fullscreenElement === containerRef.current || document.webkitFullscreenElement === containerRef.current;
       setFullscreen(active);
-      if (active) setPostureFallback(false);
     };
     document.addEventListener('fullscreenchange', update);
     document.addEventListener('webkitfullscreenchange', update);
@@ -277,16 +268,6 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
       document.removeEventListener('webkitfullscreenchange', update);
     };
   }, [containerRef]);
-
-  useEffect(() => {
-    const update = () => setDeviceOrientation(window.matchMedia?.('(orientation: portrait)').matches ? 'portrait' : 'landscape');
-    window.addEventListener('resize', update);
-    screen.orientation?.addEventListener?.('change', update);
-    return () => {
-      window.removeEventListener('resize', update);
-      screen.orientation?.removeEventListener?.('change', update);
-    };
-  }, []);
 
   const move = (direction) => {
     if (!media.length) return;
@@ -297,7 +278,6 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
   useEffect(() => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
-    setBoundaryNotice('');
   }, [index]);
 
   const zoomLimit = (value = zoom) => Math.max(0, ((value - 1) / value) * 48);
@@ -311,28 +291,10 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
       y: Math.min(limit, Math.max(-limit, value.y)),
     }));
   };
-  const movePhoto = (axis, amount) => {
-    const limit = zoomLimit();
-    if (!limit) return;
-    setCarouselPaused(true);
-    setPan((value) => {
-      const requested = value[axis] + amount;
-      const moved = Math.min(limit, Math.max(-limit, requested));
-      if (moved === value[axis] || moved !== requested) setBoundaryNotice('Fully moved in this direction.');
-      else setBoundaryNotice('');
-      return { ...value, [axis]: moved };
-    });
-  };
-
   const toggleFullscreen = async () => {
     const node = containerRef.current;
     const active = document.fullscreenElement || document.webkitFullscreenElement;
     try {
-      if (postureFallback && !active) {
-        setPostureFallback(false);
-        try { screen.orientation?.unlock?.(); } catch { /* Orientation unlock is optional. */ }
-        return;
-      }
       if (active) {
         if (document.exitFullscreen) await document.exitFullscreen();
         else document.webkitExitFullscreen?.();
@@ -348,38 +310,11 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
     }
   };
 
-  const applyOrientationMode = async (mode) => {
-    setOrientationMode(mode);
-    if (mode === 'auto') {
-      setPostureFallback(false);
-      try { screen.orientation?.unlock?.(); } catch { /* The browser may not expose orientation controls. */ }
-      setDeviceOrientation(window.matchMedia?.('(orientation: portrait)').matches ? 'portrait' : 'landscape');
-      return;
-    }
-
-    const node = containerRef.current;
-    const activeFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
-    let enteredFullscreen = Boolean(activeFullscreen);
-    try {
-      if (!activeFullscreen) {
-        if (node?.requestFullscreen) await node.requestFullscreen();
-        else if (node?.webkitRequestFullscreen) await node.webkitRequestFullscreen();
-      }
-      enteredFullscreen = document.fullscreenElement === node || document.webkitFullscreenElement === node;
-    } catch {
-      // The strict CSS posture below still applies if fullscreen is unavailable.
-    }
-    setPostureFallback(!enteredFullscreen);
-    try { if (enteredFullscreen) await screen.orientation?.lock?.(mode); } catch {
-      // Desktop and iOS browsers can reject rotation locks; the media shape remains strict.
-    }
-  };
-
   if (!current) return null;
   return (
     <div
       ref={containerRef}
-      className={`media-carousel ${short ? 'short-carousel' : ''} ${controlsVisible ? 'controls-visible' : ''} ${postureFallback ? 'posture-fallback' : ''} orientation-${shownOrientation} orientation-mode-${orientationMode}`}
+      className={`media-carousel ${short ? 'short-carousel' : ''} ${current.type === 'video' ? 'video-carousel' : 'photo-carousel'} ${controlsVisible ? 'controls-visible' : ''}`}
       tabIndex={media.length > 1 ? 0 : undefined}
       aria-label={media.length > 1 ? `Media carousel. Item ${index + 1} of ${media.length}. Use the left and right keyboard arrows to move.` : undefined}
       onKeyDown={(event) => {
@@ -396,10 +331,7 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
         if (preview) return;
         if (!event.target.closest('button,input,a,select,textarea')) containerRef.current?.focus?.({ preventScroll: true });
         if (current.type !== 'video' && media.length > 1) setCarouselPaused(true);
-        setControlsVisible((value) => {
-          if (value) setToolboxOpen(false);
-          return !value;
-        });
+        setControlsVisible((value) => !value);
       }}
       onTouchStart={(event) => {
         if (current.type !== 'video' && event.touches.length === 2) {
@@ -438,8 +370,6 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
         ) : (
           <ImageSlide item={current} index={index} preview={preview} priority={priority} zoom={zoom} pan={pan} />
         )}
-        {!preview && controlsVisible && <span className={`posture-status posture-${shownOrientation}`} role="status" aria-live="polite">{orientationMode === 'auto' ? `Following device · ${shownOrientation}` : orientationMode === 'portrait' ? 'Stand posture · portrait' : 'Sleep posture · landscape'}</span>}
-        {boundaryNotice && <div className="media-boundary-notice" role="status"><span>{boundaryNotice}</span><button type="button" onClick={(event) => { event.stopPropagation(); setBoundaryNotice(''); }} aria-label="Close movement message"><X size={16} /></button></div>}
         {media.length > 1 && (
           <>
             <button type="button" className="page-fold page-fold-left" onClick={(event) => { event.stopPropagation(); move(-1); }} aria-label="Previous item">
@@ -451,32 +381,16 @@ export function MediaCarousel({ media = [], short = false, preview = false, prio
           </>
         )}
         {!preview && controlsVisible && current.type !== 'video' && media.length > 1 && <button type="button" className="media-play carousel-play" onClick={(event) => { event.stopPropagation(); setCarouselPaused((value) => !value); }} aria-label={carouselPaused ? 'Continue photo carousel' : 'Stop photo carousel'}>{carouselPaused ? <Play size={22} fill="currentColor" /> : <Square size={20} fill="currentColor" />}</button>}
-        {!preview && controlsVisible && <button type="button" className={`media-toolbox-trigger ${toolboxOpen ? 'active' : ''}`} onClick={(event) => { event.stopPropagation(); if (current.type !== 'video') setCarouselPaused(true); setToolboxOpen((value) => !value); }} aria-expanded={toolboxOpen} aria-label="More options"><FilesFolderIcon open={toolboxOpen} /><span>More options</span></button>}
-        {!preview && controlsVisible && toolboxOpen && (
-          <div className="media-toolbox" onClick={(event) => event.stopPropagation()}>
-            <header><strong>More options</strong><button type="button" onClick={() => setToolboxOpen(false)} aria-label="Close more options"><X size={18} /></button></header>
-            <button type="button" className={`media-fullscreen ${mediaExpanded ? 'active' : ''}`} onClick={toggleFullscreen} aria-label={mediaExpanded ? 'Exit full screen' : 'View media full screen'}><PictureScreenIcon expanded={mediaExpanded} /><span>{mediaExpanded ? 'Exit full screen' : 'Full screen'}</span></button>
-            <div className="orientation-control" aria-label="Choose post posture">
-              <button type="button" className={orientationMode === 'portrait' ? 'active' : ''} onClick={() => applyOrientationMode('portrait')} aria-pressed={orientationMode === 'portrait'}><span className="posture-screen stand" /><b>Stand posture</b></button>
-              <button type="button" className={orientationMode === 'landscape' ? 'active' : ''} onClick={() => applyOrientationMode('landscape')} aria-pressed={orientationMode === 'landscape'}><span className="posture-screen sleep" /><b>Sleep posture</b></button>
-              <button type="button" className={orientationMode === 'auto' ? 'active' : ''} onClick={() => applyOrientationMode('auto')} aria-pressed={orientationMode === 'auto'}><Smartphone size={18} /><b>Follow device</b></button>
-            </div>
-            {current.type === 'video' ? (
-              <button type="button" className={`media-sound ${muted ? 'muted' : 'sound-on'}`} onClick={() => setMuted((value) => !value)} aria-label={muted ? 'Turn sound on' : 'Mute video'} title={muted ? 'Turn sound on' : 'Mute video'}><DrumSoundIcon soundOn={!muted} /><span>{muted ? 'Sound off' : 'Sound on'}</span></button>
-            ) : (
-              <div className="media-zoom-control">
-                <TelescopeZoomIcon />
-                <span>Photo zoom <b>{Math.round(zoom * 100)}%</b></span>
-                <input type="range" min="1" max="3" step="0.05" value={zoom} onChange={(event) => changeZoom(event.target.value)} aria-label="Zoom photo in or out" />
-                <div className={`photo-pan-pad ${zoom === 1 ? 'disabled' : ''}`} aria-label="Move around the zoomed photo">
-                  <button type="button" className="pan-up" onClick={() => movePhoto('y', 6)} disabled={zoom === 1} aria-label="Move photo down to see higher"><ArrowUp size={18} /></button>
-                  <button type="button" className="pan-left" onClick={() => movePhoto('x', 6)} disabled={zoom === 1} aria-label="Move photo right to see the left side"><ArrowLeft size={18} /></button>
-                  <button type="button" className="pan-reset" onClick={() => setPan({ x: 0, y: 0 })} disabled={zoom === 1} aria-label="Center the zoomed photo"><span /></button>
-                  <button type="button" className="pan-right" onClick={() => movePhoto('x', -6)} disabled={zoom === 1} aria-label="Move photo left to see the right side"><ArrowRight size={18} /></button>
-                  <button type="button" className="pan-down" onClick={() => movePhoto('y', -6)} disabled={zoom === 1} aria-label="Move photo up to see lower"><ArrowDown size={18} /></button>
-                </div>
-              </div>
+        {!preview && controlsVisible && (
+          <div className="media-top-actions" onClick={(event) => event.stopPropagation()}>
+            {current.type === 'video' && (
+              <button type="button" className={`media-sound ${muted ? 'muted' : 'sound-on'}`} onClick={() => setMuted((value) => !value)} aria-label={muted ? 'Turn sound on' : 'Mute video'} title={muted ? 'Turn sound on' : 'Mute video'}>
+                <DrumSoundIcon soundOn={!muted} />
+              </button>
             )}
+            <button type="button" className={`media-fullscreen ${mediaExpanded ? 'active' : ''}`} onClick={toggleFullscreen} aria-label={mediaExpanded ? 'Exit full screen' : 'View media full screen'} title={mediaExpanded ? 'Exit full screen' : 'Full screen'}>
+              <PictureScreenIcon expanded={mediaExpanded} />
+            </button>
           </div>
         )}
       </div>
@@ -587,7 +501,8 @@ function CommentPanel({ post, viewer, onRequireAuth, onClose, onCountChange }) {
   const [editBody, setEditBody] = useState('');
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState('');
+  const [composeError, setComposeError] = useState('');
+  const [commentActionError, setCommentActionError] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -613,7 +528,7 @@ function CommentPanel({ post, viewer, onRequireAuth, onClose, onCountChange }) {
     if (!viewer) return onRequireAuth?.();
     if (!clean || pending) return;
     setPending(true);
-    setError('');
+    setComposeError('');
     try {
       const payload = await api.createComment(post.id, clean);
       trackAnalytics('post_thought', { targetType: 'post', targetId: post.id, postId: post.id, postAuthorId: post.author?.id, metadata: { format: post.type } });
@@ -633,7 +548,7 @@ function CommentPanel({ post, viewer, onRequireAuth, onClose, onCountChange }) {
           onCountChange?.(next.length);
           return next;
         });
-      } else setError(submitError.message || 'Your comment could not be sent.');
+      } else setComposeError(submitError.message || 'Your comment could not be sent.');
     } finally {
       setBody('');
       setPending(false);
@@ -644,7 +559,7 @@ function CommentPanel({ post, viewer, onRequireAuth, onClose, onCountChange }) {
     const clean = editBody.trim();
     if (!clean || pending) return;
     setPending(true);
-    setError('');
+    setCommentActionError(null);
     try {
       if (comment.local) throw Object.assign(new Error('local'), { status: 404 });
       const payload = await api.updateComment(post.id, comment.id, clean);
@@ -656,7 +571,7 @@ function CommentPanel({ post, viewer, onRequireAuth, onClose, onCountChange }) {
           saveLocalComments(post.id, next.filter((item) => item.local));
           return next;
         });
-      } else setError(saveError.message || 'That comment could not be edited.');
+      } else setCommentActionError({ commentId: comment.id, message: saveError.message || 'That comment could not be edited.' });
     } finally {
       setEditingId(null);
       setEditBody('');
@@ -667,7 +582,7 @@ function CommentPanel({ post, viewer, onRequireAuth, onClose, onCountChange }) {
   const removeComment = async (comment) => {
     if (pending) return;
     setPending(true);
-    setError('');
+    setCommentActionError(null);
     try {
       if (comment.local) throw Object.assign(new Error('local'), { status: 404 });
       await api.deleteComment(post.id, comment.id);
@@ -684,7 +599,7 @@ function CommentPanel({ post, viewer, onRequireAuth, onClose, onCountChange }) {
           onCountChange?.(next.length);
           return next;
         });
-      } else setError(removeError.message || 'That comment could not be deleted.');
+      } else setCommentActionError({ commentId: comment.id, message: removeError.message || 'That comment could not be deleted.' });
     } finally {
       setPending(false);
     }
@@ -693,12 +608,8 @@ function CommentPanel({ post, viewer, onRequireAuth, onClose, onCountChange }) {
   return (
     <section className="comment-panel" aria-label="Comments">
       <header><strong>Speak on it</strong><button type="button" onClick={onClose} aria-label="Close comments"><X size={17} /></button></header>
-      <form className="comment-compose" onSubmit={addComment}>
-        <textarea value={body} onChange={(event) => setBody(event.target.value)} maxLength="2000" rows="3" placeholder="Write your comment…" autoFocus />
-        <div><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="submit" className="primary-button" disabled={!body.trim() || pending}><Send size={15} /> Send</button></div>
-      </form>
-      {error && <p className="form-error" role="alert">{error}</p>}
-      <div className="comment-list">
+      <section className="comment-list" aria-labelledby={`comments-title-${post.id}`}>
+        <h3 className="comment-list-title" id={`comments-title-${post.id}`}>People’s comments</h3>
         {loading ? <p>Gathering comments…</p> : comments.length ? comments.map((comment) => {
           const own = viewer && (String(comment.author?.id) === String(viewer.id) || comment.author?.username === viewer.username);
           return (
@@ -709,12 +620,19 @@ function CommentPanel({ post, viewer, onRequireAuth, onClose, onCountChange }) {
                 {editingId === comment.id ? (
                   <div className="comment-edit"><textarea value={editBody} onChange={(event) => setEditBody(event.target.value)} maxLength="2000" rows="2" /><span><button type="button" onClick={() => setEditingId(null)}>Cancel</button><button type="button" onClick={() => saveEdit(comment)}>Save</button></span></div>
                 ) : <p>{comment.body}</p>}
+                {commentActionError?.commentId === comment.id && <p className="comment-action-error" role="alert">{commentActionError.message}</p>}
               </div>
-              {own && editingId !== comment.id && <div className="comment-tools"><button type="button" onClick={() => { setEditingId(comment.id); setEditBody(comment.body); }} title="Edit comment" aria-label="Edit comment"><Pencil size={15} /></button><button type="button" onClick={() => removeComment(comment)} title="Delete comment" aria-label="Delete comment"><Trash2 size={15} /></button></div>}
+              {own && editingId !== comment.id && <div className="comment-tools"><button type="button" onClick={() => { setCommentActionError(null); setEditingId(comment.id); setEditBody(comment.body); }} title="Edit comment" aria-label="Edit comment"><Pencil size={15} /></button><button type="button" onClick={() => removeComment(comment)} title="Delete comment" aria-label="Delete comment"><Trash2 size={15} /></button></div>}
             </article>
           );
         }) : <p>No comments yet. You can speak first.</p>}
-      </div>
+      </section>
+      <form className="comment-compose" onSubmit={addComment}>
+        <label htmlFor={`comment-body-${post.id}`}>Add your comment</label>
+        {composeError && <p className="form-error" role="alert">{composeError}</p>}
+        <textarea id={`comment-body-${post.id}`} value={body} onChange={(event) => setBody(event.target.value)} maxLength="2000" rows="3" placeholder="Write your comment…" />
+        <div><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="submit" className="primary-button" disabled={!body.trim() || pending}>Send</button></div>
+      </form>
     </section>
   );
 }
@@ -807,7 +725,8 @@ export function FeedCard({ post, onPerson, onDelete, viewer, onRequireAuth, prio
 
 export function FeedSkeleton() {
   return (
-    <div className="feed-skeleton" aria-label="Loading posts" aria-busy="true">
+    <div className="feed-skeleton" aria-label="Loading posts" aria-busy="true" role="status" aria-live="polite">
+      <p className="feed-loading-label"><strong>Loading posts</strong><span className="loading-dots" aria-hidden="true">...</span></p>
       {[0, 1].map((value) => (
         <div className="skeleton-card" key={value}>
           <div className="skeleton-line short" />
@@ -832,7 +751,7 @@ export function EmptyFeed({ following = false, onEveryone }) {
 }
 
 export function LoadMore({ loading, done, onClick }) {
-  if (done) return <p className="feed-end">You reached a quiet shore. More soon.</p>;
+  if (done) return null;
   return (
     <button type="button" className="load-more" onClick={onClick} disabled={loading}>
       <OceanWave />

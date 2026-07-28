@@ -7,6 +7,8 @@ test('creates canonical public metadata for the real home feed', async () => {
   const home = await metadataForRoute(classifyPagePath('/'));
   assert.equal(home.url, 'https://socialmediamother.onrender.com/');
   assert.equal(home.type, 'website');
+  assert.equal(home.image, '/brand/me-click-og.png');
+  assert.match(home.imageAlt, /human finger pressing it/);
   assert.match(home.robots, /^index/);
 });
 
@@ -14,6 +16,7 @@ test('keeps account, settings, and upload routes out of search results', async (
   for (const pathname of [
     '/createaccount',
     '/accountin',
+    '/analytics',
     '/jasmine/setting',
     '/jasmine/upload',
     '/jasmine/upload/short-video-post'
@@ -23,6 +26,12 @@ test('keeps account, settings, and upload routes out of search results', async (
     assert.equal(metadata.url, `https://socialmediamother.onrender.com${route.path}`);
     assert.equal(metadata.robots, 'noindex, nofollow, noarchive');
   }
+});
+
+test('uses analytics as the canonical whole-web analytics team address', async () => {
+  const direct = await metadataForRoute(classifyPagePath('/analytics'));
+  assert.equal(direct.url, 'https://socialmediamother.onrender.com/analytics');
+  assert.match(direct.title, /Analytics team/);
 });
 
 test('replaces inherited SEO tags instead of duplicating them', async () => {
@@ -36,4 +45,6 @@ test('replaces inherited SEO tags instead of duplicating them', async () => {
   assert.equal((output.match(/rel="canonical"/g) || []).length, 1);
   assert.match(output, /noindex, nofollow, noarchive/);
   assert.match(output, /https:\/\/socialmediamother\.onrender\.com\/createaccount/);
+  assert.match(output, /twitter:image:alt/);
+  assert.match(output, /brand\/me-click-og\.png/);
 });

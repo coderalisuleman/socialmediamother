@@ -9,6 +9,7 @@ import { OtpChallenge } from '../models/OtpChallenge.js';
 import { Comment } from '../models/Comment.js';
 import { AppError } from '../utils/errors.js';
 import { escapeRegex } from '../utils/normalize.js';
+import { candidateSearchFragments } from './searchRanking.js';
 
 const memory = {
   users: new Map(),
@@ -376,7 +377,7 @@ export const listPostsByAuthor = async (authorId, { before, limit = 12, type } =
 export const listFeedCandidates = async ({ authorIds, before, limit }) => {
   if (config.storageMode === 'mongodb') {
     const filter = { deletedAt: null };
-    if (authorIds?.length) filter.author = { $in: authorIds };
+    if (Array.isArray(authorIds)) filter.author = { $in: authorIds };
     if (before?.createdAt) {
       filter.$or = [
         { createdAt: { $lt: new Date(before.createdAt) } },
@@ -388,7 +389,7 @@ export const listFeedCandidates = async ({ authorIds, before, limit }) => {
     return posts.map(asPlainPost);
   }
   return [...memory.posts.values()]
-    .filter((post) => !post.deletedAt && (!authorIds?.length || authorIds.includes(post.author)))
+    .filter((post) => !post.deletedAt && (!Array.isArray(authorIds) || authorIds.includes(post.author)))
     .filter((post) => !before?.createdAt || post.createdAt < before.createdAt || (post.createdAt === before.createdAt && post.id < before.id))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
     .slice(0, limit + 1).map(hydrateMemoryPost);
@@ -564,11 +565,11 @@ export const recordView = async (userId, postId) => {
 
 export const searchCandidates = async ({ query, type, max = 150 }) => {
   const boundedQuery = String(query || '').trim().slice(0, 160);
-  const terms = [boundedQuery, ...boundedQuery.split(/\s+/).filter((term) => term.length >= 2)]
+  const terms = candidateSearchFragments(boundedQuery)
     .map((term) => term.slice(0, 80))
     .filter(Boolean)
     .filter((term, index, all) => all.indexOf(term) === index)
-    .slice(0, 10);
+    .slice(0, 14);
   const regexes = terms.map((term) => new RegExp(escapeRegex(term), 'i'));
   const regex = regexes[0] || /$a/;
   if (config.storageMode === 'mongodb') {

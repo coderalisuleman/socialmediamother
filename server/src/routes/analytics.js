@@ -63,21 +63,48 @@ analyticsRouter.post('/team/login', asyncHandler(async (req, res) => {
   const email = safeText(req.body?.email, 180).toLowerCase();
   const password = String(req.body?.password || '');
   if (!config.analytics.passwordHash) {
-    throw new AppError(503, 'Human-behaviour login needs ANALYTICS_TEAM_PASSWORD_HASH in the server environment.', 'ANALYTICS_NOT_CONFIGURED');
+    throw new AppError(503, 'Analytics login needs ANALYTICS_TEAM_PASSWORD_HASH in the server environment.', 'ANALYTICS_NOT_CONFIGURED');
   }
   const valid = email === config.analytics.teamEmail && await bcrypt.compare(password, config.analytics.passwordHash);
-  if (!valid) throw new AppError(401, 'Human-behaviour team email or password is incorrect', 'INVALID_ANALYTICS_CREDENTIALS');
+  if (!valid) throw new AppError(401, 'Analytics team email or password is incorrect', 'INVALID_ANALYTICS_CREDENTIALS');
   res.json({ token: signAnalyticsToken(email), team: { email } });
 }));
 
-const adminReportFromRows = (rows, since) => {
+export const friendlyAnalyticsEventType = (row) => {
+  if (row?.eventType === 'post_view') {
+    const format = String(row?.metadata?.format || '').toLowerCase();
+    const postViewNames = {
+      text: 'text_post_view',
+      photo: 'photo_post_view',
+      video: 'video_post_view',
+      'short-video': 'short_video_post_view',
+    };
+    return postViewNames[format] || 'post_view';
+  }
+  if (row?.eventType === 'connection') {
+    if (row?.metadata?.network === 'online') return 'internet_connected';
+    if (row?.metadata?.network === 'offline') return 'internet_disconnected';
+    return 'internet_status_changed';
+  }
+  if (row?.eventType === 'visibility') {
+    if (row?.metadata?.visibility === 'visible') return 'returned_to_page';
+    if (row?.metadata?.visibility === 'hidden') return 'switched_away_from_page';
+    return 'page_view_status_changed';
+  }
+  return row?.eventType || 'other_action';
+};
+
+const adminReportFromRows = (rows, since, mode = 'days', days = null) => {
   const sessions = new Set();
   const eventCounts = new Map();
+  const rawEventCounts = new Map();
   const pathCounts = new Map();
   let watchingMs = 0;
   for (const row of rows) {
     sessions.add(row.sessionId);
-    eventCounts.set(row.eventType, (eventCounts.get(row.eventType) || 0) + 1);
+    const friendlyType = friendlyAnalyticsEventType(row);
+    eventCounts.set(friendlyType, (eventCounts.get(friendlyType) || 0) + 1);
+    rawEventCounts.set(row.eventType, (rawEventCounts.get(row.eventType) || 0) + 1);
     pathCounts.set(row.path, (pathCounts.get(row.path) || 0) + 1);
     if (row.eventType === 'media_watch') watchingMs += Number(row.durationMs || 0);
   }
@@ -85,15 +112,15 @@ const adminReportFromRows = (rows, since) => {
   const eventTypes = top(eventCounts, 'eventType');
   const paths = top(pathCounts, 'path');
   const recommendations = [];
-  const errors = eventCounts.get('asset_error') || 0;
-  const searches = eventCounts.get('search') || 0;
-  const exits = eventCounts.get('session_end') || 0;
+  const errors = rawEventCounts.get('asset_error') || 0;
+  const searches = rawEventCounts.get('search') || 0;
+  const exits = rawEventCounts.get('session_end') || 0;
   if (errors) recommendations.push(`${errors} media or page loading errors occurred. Review the affected paths and connection details first.`);
-  if (searches && !(eventCounts.get('search_result_open') || 0)) recommendations.push('People are searching but rarely opening a result. Refine result labels and ranking.');
+  if (searches && !(rawEventCounts.get('search_result_open') || 0)) recommendations.push('People are searching but rarely opening a result. Refine result labels and ranking.');
   if (exits > sessions.size * .8) recommendations.push('Many recorded sessions ended after little interaction. Review the top exit paths and first-screen clarity.');
   if (!recommendations.length) recommendations.push('No strong problem pattern appears in this period. Compare top paths and watch time week over week.');
   return {
-    period: { since, until: new Date().toISOString() },
+    period: { mode, since, until: new Date().toISOString(), days: mode === 'days' ? days : null },
     totals: { events: rows.length, sessions: sessions.size, watchingSeconds: Math.round(watchingMs / 1000) },
     eventTypes,
     paths,
@@ -103,12 +130,15 @@ const adminReportFromRows = (rows, since) => {
 };
 
 analyticsRouter.get('/team/report', requireAnalyticsTeam, asyncHandler(async (req, res) => {
-  const days = Math.min(365, Math.max(1, Number.parseInt(req.query.days || '30', 10) || 30));
-  const sinceDate = new Date(Date.now() - days * 86_400_000);
+  const lifetime = req.query.lifetime === 'true';
+  const days = Math.min(36_500, Math.max(1, Number.parseInt(req.query.days || '30', 10) || 30));
+  const sinceDate = lifetime ? null : new Date(Date.now() - days * 86_400_000);
   const rows = config.storageMode === 'mongodb'
-    ? await AnalyticsEvent.find({ occurredAt: { $gte: sinceDate } }).sort({ occurredAt: 1 }).limit(100_000).lean()
-    : memoryEvents.filter((event) => new Date(event.occurredAt) >= sinceDate);
-  res.json(adminReportFromRows(rows.map((row) => ({ ...row, id: String(row._id || '') })), sinceDate.toISOString()));
+    ? await AnalyticsEvent.find(sinceDate ? { occurredAt: { $gte: sinceDate } } : {}).sort({ occurredAt: 1 }).limit(500_000).lean()
+    : memoryEvents.filter((event) => !sinceDate || new Date(event.occurredAt) >= sinceDate);
+  const plainRows = rows.map((row) => ({ ...row, id: String(row._id || '') }));
+  const since = sinceDate?.toISOString() || plainRows[0]?.occurredAt || null;
+  res.json(adminReportFromRows(plainRows, since, lifetime ? 'lifetime' : 'days', lifetime ? null : days));
 }));
 
 analyticsRouter.get('/creator/report', requireAuth, asyncHandler(async (req, res) => {

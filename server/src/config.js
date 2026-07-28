@@ -21,6 +21,38 @@ const isRender = process.env.RENDER === 'true';
 const isProduction = nodeEnv === 'production' || isRender;
 const mongoUri = process.env.MONGODB_URI?.trim() || '';
 const allowMemoryStorage = process.env.ALLOW_MEMORY_STORAGE === 'true';
+const awsRegion = process.env.AWS_REGION?.trim() || '';
+const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID?.trim() || '';
+const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY?.trim() || '';
+const s3Bucket = process.env.AWS_S3_BUCKET?.trim() || '';
+export const resolveS3Region = (environment = process.env) => (
+  environment.AWS_S3_REGION?.trim()
+  || environment.AWS_REGION?.trim()
+  || ''
+);
+const s3Region = resolveS3Region();
+const mediaCdnBaseUrl = (
+  process.env.MEDIA_CDN_BASE_URL
+  || process.env.AWS_CLOUDFRONT_URL
+  || ''
+).trim().replace(/\/$/, '');
+const cloudFrontDistributionId = process.env.AWS_CLOUDFRONT_DISTRIBUTION_ID?.trim() || '';
+
+if (s3Bucket && !s3Region) {
+  throw new Error('AWS_S3_REGION (or AWS_REGION as a fallback) is required when AWS_S3_BUCKET is configured');
+}
+
+if (mediaCdnBaseUrl && !s3Bucket) {
+  throw new Error('AWS_S3_BUCKET is required when MEDIA_CDN_BASE_URL is configured');
+}
+
+if (mediaCdnBaseUrl && !cloudFrontDistributionId) {
+  throw new Error('AWS_CLOUDFRONT_DISTRIBUTION_ID is required when MEDIA_CDN_BASE_URL is configured');
+}
+
+if (cloudFrontDistributionId && !mediaCdnBaseUrl) {
+  throw new Error('MEDIA_CDN_BASE_URL is required when AWS_CLOUDFRONT_DISTRIBUTION_ID is configured');
+}
 
 if (isProduction && !mongoUri) {
   throw new Error('MONGODB_URI is required in production and on Render');
@@ -62,11 +94,17 @@ export const config = Object.freeze({
   otpSecret: process.env.OTP_SECRET || process.env.JWT_SECRET || 'local-only-social-media-mother-otp-secret',
   otpTtlMinutes: asPositiveInt(process.env.OTP_TTL_MINUTES, 10),
   aws: {
-    region: process.env.AWS_REGION?.trim() || '',
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID?.trim() || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY?.trim() || '',
+    region: awsRegion,
+    accessKeyId: awsAccessKeyId,
+    secretAccessKey: awsSecretAccessKey,
     sesFromEmail: process.env.AWS_SES_FROM_EMAIL?.trim() || '',
-    snsOriginationNumber: process.env.AWS_SNS_ORIGINATION_NUMBER?.trim() || ''
+    snsOriginationNumber: process.env.AWS_SNS_ORIGINATION_NUMBER?.trim() || '',
+    s3Bucket,
+    s3Region,
+    s3Prefix: process.env.AWS_S3_PREFIX?.trim() || 'media',
+    mediaCdnBaseUrl,
+    cloudFrontDistributionId,
+    mediaStorageEnabled: Boolean(s3Bucket && s3Region),
   },
   maxUploadBytes: asPositiveInt(process.env.MAX_UPLOAD_MB, 250) * 1024 * 1024,
   maxFilesPerPost: Math.min(asPositiveInt(process.env.MAX_FILES_PER_POST, 20), 50)

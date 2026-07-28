@@ -1,24 +1,23 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown, Search, X } from 'lucide-react';
 
-function FeedSwitch({ feedMode, onFeedMode }) {
+function FeedSwitch({ feedMode = 'everyone', onFeedMode }) {
   return (
     <div className="feed-switch" aria-label="Choose whose posts to see">
       <button type="button" className={feedMode === 'everyone' ? 'active' : ''} onClick={() => onFeedMode('everyone')} aria-pressed={feedMode === 'everyone'}>
         Everyones Every Post
       </button>
       <button type="button" className={feedMode === 'following' ? 'active' : ''} onClick={() => onFeedMode('following')} aria-pressed={feedMode === 'following'}>
-        The People To with I want To be There Posts
+        The People I Want To See There Posts
       </button>
     </div>
   );
 }
 
-function HuggingBrandPicture({ size = 44 }) {
+function ClickingBrandPicture({ size = 44 }) {
   return (
-    <span className="brand-hug-picture" style={{ '--brand-picture-size': `${size}px` }}>
-      <img src="/icon-192.png" alt="" width={size} height={size} />
-      <i className="love-particle love-one">♥</i><i className="love-particle love-two">♥</i><i className="love-particle love-three">♥</i>
+    <span className="brand-click-picture" style={{ '--brand-picture-size': `${size}px` }}>
+      <img src="/brand/me-click-icon-192.png" alt="" width={size} height={size} />
     </span>
   );
 }
@@ -39,12 +38,12 @@ export default function Nav({ query, onQuery, feedMode, onFeedMode, user, onHome
       </button>
       <nav className="top-nav" aria-label="Main navigation">
         <a href="/" className="brand-link" aria-label="Social Media Mother home" onClick={(event) => { event.preventDefault(); onHome?.(); }}>
-          <HuggingBrandPicture />
+          <ClickingBrandPicture />
           <span className="brand-word">Social Media Mother</span>
         </a>
 
         <div className="nav-control-grid">
-          <FeedSwitch feedMode={feedMode} onFeedMode={onFeedMode} />
+          <span className="nav-balance-spacer" aria-hidden="true" />
           <label className="smart-search">
             <Search size={19} aria-hidden="true" />
             <span className="sr-only">Search people and posts</span>
@@ -61,6 +60,9 @@ export default function Nav({ query, onQuery, feedMode, onFeedMode, user, onHome
               </>
             )}
           </div>
+        </div>
+        <div className="feed-switch-row">
+          <FeedSwitch feedMode={feedMode} onFeedMode={onFeedMode} />
         </div>
       </nav>
     </header>

@@ -3,6 +3,7 @@ const POST_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
 
 export const RESERVED_USERNAMES = Object.freeze([
   'accountin',
+  'analytics',
   'api',
   'assets',
   'brand',
@@ -63,7 +64,7 @@ export const classifyPagePath = (value) => {
     const segment = segments[0].toLowerCase();
     if (segment === 'createaccount') return privateRoute('createaccount', '/createaccount');
     if (segment === 'accountin') return privateRoute('accountin', '/accountin');
-    if (segment === 'humanbehaviour') return privateRoute('humanbehaviour', '/humanbehaviour');
+    if (segment === 'analytics') return privateRoute('analytics', '/analytics');
     if (isPublicUsername(segment)) return { kind: 'profile', username: segment, path: `/${segment}` };
     return { kind: 'unknown' };
   }

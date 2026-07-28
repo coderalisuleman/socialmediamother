@@ -33,6 +33,10 @@ services:
         value: businessalisuleman@gmail.com
       - key: ANALYTICS_TEAM_PASSWORD_HASH
         sync: false
+      # FUTURE OWNER: add values from their own AWS account in the Render
+      # Dashboard under Service > Environment. `sync: false` deliberately keeps
+      # secrets blank in Git. Never use or commit AWS root-account credentials.
+      # AWS_REGION is for SES/SNS verification services.
       - key: AWS_REGION
         sync: false
       - key: AWS_ACCESS_KEY_ID
@@ -43,6 +47,15 @@ services:
         sync: false
       - key: AWS_SNS_ORIGINATION_NUMBER
         sync: false
+      # FUTURE OWNER MEDIA SETUP:
+      # Deploy infra/aws-media-cdn.yaml with CAPABILITY_IAM, attach its
+      # MediaApplicationManagedPolicyArn output to the application IAM identity,
+      # then copy the stack outputs into these blank Render environment values:
+      # AWS_S3_REGION = stack region (for example ap-southeast-1)
+      # AWS_S3_BUCKET = MediaBucketName
+      # MEDIA_CDN_BASE_URL = MediaCdnBaseUrl
+      # AWS_CLOUDFRONT_DISTRIBUTION_ID = CloudFrontDistributionId
+      # Leaving AWS_S3_BUCKET blank keeps the MongoDB GridFS fallback active.
       - key: AWS_S3_REGION
         sync: false
       - key: AWS_S3_BUCKET

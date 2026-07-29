@@ -1,4 +1,8 @@
-social media mother -- readme.md [imp] to read and understand
+Demo account for anyone who wants to check the live website:
+Email: demosocialmediamother@gmail.com
+Password: demo1234
+This is a public demo account, so do not add private or personal information.
+
 
 OPEN SOURCE DUE TO CODEX PRIZE PARTICIPATION:
 
